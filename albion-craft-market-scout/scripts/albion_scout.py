@@ -60,7 +60,8 @@ ROUTE_NOTE = {
     "Brecilien": "Brecilien: Travel Planner fee, or the Mists (portal needs 50,000 standing)",
 }
 
-SALES_TAX = 0.08              # non-Premium; Premium is 0.04 (--premium)
+SALES_TAX = 0.08              # non-Premium
+PREMIUM_TAX = 0.04            # with Premium (--premium)
 SETUP_FEE = 0.025             # charged when you post a sell order or buy order
 NUTRITION_PER_VALUE = 0.1125  # station nutrition used = item value * this
 DEFAULT_FEE_PER_100 = 1000    # maximum a station owner may charge per 100 nutrition
@@ -106,6 +107,7 @@ SCAN_GROUPS = {
     "mounts": lambda m: m["shop"] == "mounts",
     "refining": lambda m: m["shop"] == "crafting" and m["sub"] == "refinedresources",
 }
+DEFAULT_SCAN_GROUPS = [g for g in SCAN_GROUPS if g not in ("refining", "mounts")]
 
 
 # --------------------------------------------------------------------------
@@ -177,8 +179,10 @@ def parse_ts(s):
         return None
 
 
-def hours_since(ts):
-    return None if ts is None else max(0.0, (now_utc() - ts).total_seconds() / 3600.0)
+def hours_since(ts, now=None):
+    if ts is None:
+        return None
+    return max(0.0, ((now or now_utc()) - ts).total_seconds() / 3600.0)
 
 
 def out(text=""):
@@ -425,50 +429,66 @@ def loc_param(locations):
 
 def fetch_quotes(host, ids, locations):
     """{(item, city): {ask, ask_age_h, bid, bid_age_h}} for quality 1."""
-    ids = sorted(set(ids))
-    quotes = {}
+    rows = []
     query = "?locations=%s&qualities=1" % loc_param(locations)
-    for chunk in chunked(ids, len(host) + 40 + len(query)):
+    for chunk in chunked(sorted(set(ids)), len(host) + 40 + len(query)):
         path = ",".join(urllib.parse.quote(i, safe="@_") for i in chunk)
-        for row in get_json("%s/api/v2/stats/prices/%s.json%s" % (host, path, query)):
-            city = CITY_BY_NORM.get(norm_city(row.get("city")))
-            if not city:
-                continue
-            ask_t = parse_ts(row.get("sell_price_min_date"))
-            bid_t = parse_ts(row.get("buy_price_max_date"))
-            quotes[(row["item_id"], city)] = {
-                "ask": row.get("sell_price_min") or None if ask_t else None,
-                "ask_age_h": hours_since(ask_t),
-                "bid": row.get("buy_price_max") or None if bid_t else None,
-                "bid_age_h": hours_since(bid_t),
-            }
+        rows.extend(get_json("%s/api/v2/stats/prices/%s.json%s" % (host, path, query)))
+    return parse_prices(rows, now_utc())
+
+
+def parse_prices(rows, now):
+    """Price API rows -> quotes. Zero prices and 0001-01-01 dates mean no data."""
+    quotes = {}
+    for row in rows:
+        city = CITY_BY_NORM.get(norm_city(row.get("city")))
+        if not city:
+            continue
+        ask_t = parse_ts(row.get("sell_price_min_date"))
+        bid_t = parse_ts(row.get("buy_price_max_date"))
+        quotes[(row["item_id"], city)] = {
+            "ask": row.get("sell_price_min") or None if ask_t else None,
+            "ask_age_h": hours_since(ask_t, now),
+            "bid": row.get("buy_price_max") or None if bid_t else None,
+            "bid_age_h": hours_since(bid_t, now),
+        }
     return quotes
+
+
+def history_start(now, days):
+    return now.date() - timedelta(days=days)
 
 
 def fetch_history(host, ids, locations, days=14):
     """{(item, city): summary} from daily buckets; first partial bucket dropped."""
-    end = now_utc().date()
-    start = end - timedelta(days=days)
+    now = now_utc()
+    start = history_start(now, days)
     query = "?date=%s&end_date=%s&locations=%s&qualities=1&time-scale=24" % (
-        start.isoformat(), end.isoformat(), loc_param(locations))
-    series = {}
-    latest = None
+        start.isoformat(), now.date().isoformat(), loc_param(locations))
+    rows = []
     for chunk in chunked(sorted(set(ids)), len(host) + 40 + len(query)):
         path = ",".join(urllib.parse.quote(i, safe="@_") for i in chunk)
-        for row in get_json("%s/api/v2/stats/history/%s.json%s" % (host, path, query)):
-            city = CITY_BY_NORM.get(norm_city(row.get("location")))
-            if not city:
+        rows.extend(get_json("%s/api/v2/stats/history/%s.json%s" % (host, path, query)))
+    return summarize_history(rows, start)
+
+
+def summarize_history(rows, start):
+    series = {}
+    latest = None
+    for row in rows:
+        city = CITY_BY_NORM.get(norm_city(row.get("location")))
+        if not city:
+            continue
+        days_map = series.setdefault((row["item_id"], city), {})
+        for d in row.get("data") or []:
+            ts = parse_ts(d.get("timestamp"))
+            if ts is None or ts.date() < start:
                 continue
-            days_map = series.setdefault((row["item_id"], city), {})
-            for d in row.get("data") or []:
-                ts = parse_ts(d.get("timestamp"))
-                if ts is None or ts.date() < start:
-                    continue
-                day = ts.date()
-                cnt, avg = d.get("item_count") or 0, d.get("avg_price") or 0
-                prev = days_map.get(day, (0, 0))
-                days_map[day] = (prev[0] + cnt, prev[1] + cnt * avg)
-                latest = day if latest is None or day > latest else latest
+            day = ts.date()
+            cnt, avg = d.get("item_count") or 0, d.get("avg_price") or 0
+            prev = days_map.get(day, (0, 0))
+            days_map[day] = (prev[0] + cnt, prev[1] + cnt * avg)
+            latest = day if latest is None or day > latest else latest
     # Each city's scans lag by a different number of days, so every series gets
     # its own 7/14-day window ending at its latest bucket, plus a lag figure.
     summaries = {}
@@ -918,7 +938,7 @@ def cmd_evaluate(args):
 def cmd_scan(args):
     db = load_db(args)
     host = HOSTS[args.server]
-    groups = args.groups or [g for g in SCAN_GROUPS if g not in ("refining", "mounts")]
+    groups = args.groups or DEFAULT_SCAN_GROUPS
     tiers = set(range(args.min_tier, args.max_tier + 1))
     enchants = set(range(args.min_enchant, args.max_enchant + 1))
     ids = []
@@ -946,7 +966,10 @@ def cmd_scan(args):
     order = {"pilot": 0, "watch": 1, "avoid": 2}
     final.sort(key=lambda r: (order[r["verdict"]], -(r["daily_capacity"] or 0)))
     if args.json:
-        out(json.dumps({"scanned": len(ids), "profitable_on_quotes": len(stage1),
+        out(json.dumps({"generated": now_utc().isoformat(), "server": args.server, "groups": groups,
+                        "tiers": [args.min_tier, args.max_tier],
+                        "enchants": [args.min_enchant, args.max_enchant],
+                        "scanned": len(ids), "profitable_on_quotes": len(stage1),
                         "results": final[:args.top]}, indent=1, default=str))
         return
     print_assumptions(args)
@@ -959,6 +982,47 @@ def cmd_scan(args):
     scan_table(final, args.top)
     out("")
     out("These are leads. Run `evaluate ITEM` on a row before crafting.")
+
+
+def cmd_export_index(args):
+    """Write the compact recipe index and constants that the web app (web/core.js) loads."""
+    db = load_db(args)
+    items, names = {}, {}
+    for iid, it in db["items"].items():
+        groups = [g for g, match in SCAN_GROUPS.items() if match(it)]
+        if not groups or iid.startswith(("UNIQUE_", "QUESTITEM_")):
+            continue
+        value, complete = item_value(db, iid)
+        items[iid] = {
+            "tier": it["tier"], "ench": it["ench"], "groups": groups,
+            "category": "%s/%s" % (it["shop"], it["sub"]),
+            "spec": specialization_city(it), "refining": is_refining(it),
+            "recipes": it["recipes"], "value": value, "value_complete": complete,
+        }
+        names[iid] = name_of(db, iid)
+        for alt in it["recipes"]:
+            for inp, _, _ in alt["inputs"]:
+                names[inp] = name_of(db, inp)
+    econ = {
+        "hosts": HOSTS, "royal": ROYAL, "buy_markets": BUY_MARKETS, "sell_markets": SELL_MARKETS,
+        "craft_cities": CRAFT_CITIES, "route_risk": ROUTE_RISK, "route_note": ROUTE_NOTE,
+        "sales_tax": SALES_TAX, "premium_tax": PREMIUM_TAX, "setup_fee": SETUP_FEE,
+        "nutrition_per_value": NUTRITION_PER_VALUE, "default_fee_per_100": DEFAULT_FEE_PER_100,
+        "base_bonus": BASE_BONUS, "craft_spec_bonus": CRAFT_SPEC_BONUS,
+        "refine_spec_bonus": REFINE_SPEC_BONUS, "fresh_hours": FRESH_HOURS,
+        "max_age_hours": MAX_AGE_HOURS, "min_margin": MIN_MARGIN, "min_daily_units": MIN_DAILY_UNITS,
+        "min_coverage_days": MIN_COVERAGE_DAYS, "outlier_band": OUTLIER_BAND,
+        "capture_share": CAPTURE_SHARE, "pilot_share": PILOT_SHARE,
+        "scan_groups": list(SCAN_GROUPS), "default_groups": DEFAULT_SCAN_GROUPS,
+    }
+    data = {"recipes_built": db["built"], "exported": now_utc().isoformat(),
+            "econ": econ, "items": items, "names": names}
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, separators=(",", ":"))
+    sys.stderr.write("Wrote %d items to %s (%.1f MB)\n" % (
+        len(items), out_path, out_path.stat().st_size / 1e6))
 
 
 def print_assumptions(args):
@@ -1062,9 +1126,14 @@ def main(argv=None):
     add_econ(p)
     p.set_defaults(func=cmd_scan)
 
+    p = sub.add_parser("export-index", help="write the recipe index used by the web app")
+    p.add_argument("--out", default="web/data/index.json")
+    add_common(p, market=False)
+    p.set_defaults(func=cmd_export_index)
+
     args = ap.parse_args(argv)
     if hasattr(args, "premium"):
-        args.tax = 0.04 if args.premium else SALES_TAX
+        args.tax = PREMIUM_TAX if args.premium else SALES_TAX
     if getattr(args, "avoid_red_zones", False):
         args.sources = [c for c in args.sources if c not in ROUTE_RISK]
         args.sells = [c for c in args.sells if c not in ROUTE_RISK]

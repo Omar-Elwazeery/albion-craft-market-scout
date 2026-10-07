@@ -55,7 +55,7 @@ Use this when you cannot run Python. URL details and response examples: [data so
 4. **Get sales.** Open `https://europe.albion-online-data.com/api/v2/stats/history/{OUTPUT_ID}.json?date={today minus 14 days}&end_date={today}&locations={sell cities}&qualities=1&time-scale=24`.
 5. **Compute** with the formulas below and apply "Decision rules".
 
-If you cannot open web pages either, give the user these exact URLs and ask them to paste the responses. They can also read prices from the in-game market.
+If you cannot open web pages either, give the user these exact URLs and ask them to paste the responses. They can also read prices from the in-game market, or run the same scan and item check in their browser at https://omar-elwazeery.github.io/albion-craft-market-scout/ and paste the results back.
 
 ## Formulas (per craft)
 

@@ -1,0 +1,9 @@
+{
+  "name": "albion-craft-market-scout",
+  "private": true,
+  "type": "module",
+  "description": "Web app and parity test for the Albion craft scout skill",
+  "scripts": {
+    "test": "python tests/parity/run.py"
+  }
+}

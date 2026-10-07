@@ -1,0 +1,54 @@
+name: Build and publish the web app
+
+# Rebuilds the recipe index from the latest game data, checks that the
+# JavaScript and Python versions still agree, refreshes the example scan,
+# and publishes web/ to GitHub Pages.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 4 * * *"   # daily, so the example scan and recipes stay current
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build the recipe index
+        run: python3 albion-craft-market-scout/scripts/albion_scout.py export-index --out web/data/index.json
+
+      - name: Check that Python and JavaScript give the same results
+        run: python3 tests/parity/run.py
+
+      - name: Run the example scan shown on first visit
+        # A failed scan only means the page opens without example rows.
+        run: |
+          python3 albion-craft-market-scout/scripts/albion_scout.py scan --json --top 25 > web/data/sample-scan.json \
+            || echo '{}' > web/data/sample-scan.json
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

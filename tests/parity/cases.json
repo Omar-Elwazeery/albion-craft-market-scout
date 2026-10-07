@@ -1,0 +1,14 @@
+[
+  {"name": "defaults", "history": true, "opts": {}},
+  {"name": "quotes only (scan stage 1)", "history": false, "opts": {}},
+  {"name": "safe, premium, costs known", "history": true, "opts": {
+    "tax": 0.04,
+    "sources": ["Bridgewatch", "Fort Sterling", "Lymhurst", "Martlock", "Thetford", "Brecilien"],
+    "sells": ["Bridgewatch", "Fort Sterling", "Lymhurst", "Martlock", "Thetford", "Brecilien"],
+    "transport": 350, "budget": 150000, "fee_per_100": 400
+  }},
+  {"name": "forced cities and bonuses", "history": true, "opts": {
+    "craft_city": "Caerleon", "sell_city": "Martlock", "daily_bonus": 0.2, "station_fee": 1200, "max_age": 12
+  }},
+  {"name": "return rate override", "history": true, "opts": {"rrr": 0.3, "sell_city": "Black Market"}}
+]

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Albion Craft Scout</title>
+  <meta name="description" content="Find Albion Online crafts that make silver, checked against live market prices and real sales volume.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%23b4892f'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23fff3d6' stroke-width='2'/%3E%3C/svg%3E">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="coin" aria-hidden="true"></span>
+      <div>
+        <h1>Albion Craft Scout</h1>
+        <p class="tagline">Crafts that make silver, checked against live prices and real sales.</p>
+      </div>
+    </div>
+    <form class="item-search" id="item-search" role="search" autocomplete="off">
+      <label for="item-query" class="visually-hidden">Check one item</label>
+      <input id="item-query" type="search" placeholder="Check one item, e.g. Adept's Bag or T6_MAIN_SWORD@2" aria-autocomplete="list" aria-controls="item-suggestions">
+      <ul id="item-suggestions" class="suggestions" role="listbox" hidden></ul>
+    </form>
+  </header>
+
+  <main class="layout">
+    <aside class="panel settings" aria-label="Scan settings">
+      <form id="settings">
+        <fieldset>
+          <legend>You</legend>
+          <label class="field" for="server">Server
+            <select id="server">
+              <option value="europe">Europe</option>
+              <option value="west">Americas</option>
+              <option value="east">Asia</option>
+            </select>
+          </label>
+          <label class="check" for="premium"><input type="checkbox" id="premium"> Premium (4% sales tax instead of 8%)</label>
+          <label class="check" for="avoid-red"><input type="checkbox" id="avoid-red"> Skip red-zone routes (Caerleon, Black Market)</label>
+          <label class="field" for="budget">Silver for a test batch
+            <input id="budget" type="number" min="0" step="10000" placeholder="no limit" inputmode="numeric">
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>What to scan</legend>
+          <div class="groups" id="groups"></div>
+          <div class="pair">
+            <label class="field" for="min-tier">Tier from
+              <select id="min-tier"></select>
+            </label>
+            <label class="field" for="max-tier">to
+              <select id="max-tier"></select>
+            </label>
+          </div>
+          <div class="pair">
+            <label class="field" for="min-ench">Enchant from
+              <select id="min-ench"></select>
+            </label>
+            <label class="field" for="max-ench">to
+              <select id="max-ench"></select>
+            </label>
+          </div>
+        </fieldset>
+
+        <details class="costs">
+          <summary>Costs and bonuses</summary>
+          <label class="field" for="fee">Station fee, silver per 100 nutrition
+            <input id="fee" type="number" min="0" max="1000" step="10" inputmode="numeric">
+            <small>Owners set this. 1,000 is the maximum, so profits are cautious until you enter the real fee.</small>
+          </label>
+          <label class="field" for="transport">Transport, silver per craft
+            <input id="transport" type="number" min="0" step="50" placeholder="unknown" inputmode="numeric">
+            <small>Left empty, each item shows how much transport it can absorb before losing money.</small>
+          </label>
+          <label class="field" for="daily-bonus">Today's production bonus
+            <select id="daily-bonus">
+              <option value="0">None</option>
+              <option value="0.1">+10%</option>
+              <option value="0.2">+20%</option>
+            </select>
+            <small>Used when you check one item. See the in-game Activities menu.</small>
+          </label>
+        </details>
+
+        <button type="submit" class="primary" id="scan-btn">Scan the market</button>
+        <p class="hint">A full scan sends about 50 requests to the Albion Online Data Project and takes 15 to 30 seconds.</p>
+      </form>
+    </aside>
+
+    <section class="results" aria-live="polite">
+      <div class="status" id="status"></div>
+      <div class="progress" id="progress" hidden>
+        <div class="bar"><span id="progress-bar"></span></div>
+        <p id="progress-text"></p>
+      </div>
+      <div class="table-wrap">
+        <table class="grid" id="results-table">
+          <thead>
+            <tr>
+              <th scope="col">Item</th>
+              <th scope="col">Craft in</th>
+              <th scope="col">Sell in</th>
+              <th scope="col" class="num">Cost / craft</th>
+              <th scope="col" class="num">Profit / craft</th>
+              <th scope="col" class="num">Margin</th>
+              <th scope="col" class="num">Sold / day</th>
+              <th scope="col">Verdict</th>
+            </tr>
+          </thead>
+          <tbody id="results-body"></tbody>
+        </table>
+      </div>
+      <p class="legend">
+        <span class="pill pilot">pilot</span> every check passed: try a small batch.
+        <span class="pill watch">watch</span> profitable, but a check failed.
+        <span class="chip risk">red zone</span> route crosses full-loot PvP zones.
+      </p>
+    </section>
+  </main>
+
+  <dialog id="detail" aria-labelledby="detail-title">
+    <div class="detail-head">
+      <img id="detail-icon" alt="" width="56" height="56">
+      <div class="detail-title-wrap">
+        <h2 id="detail-title"></h2>
+        <p class="mono" id="detail-id"></p>
+      </div>
+      <button type="button" class="close" id="detail-close" aria-label="Close">&times;</button>
+    </div>
+    <div id="detail-body"></div>
+  </dialog>
+
+  <footer class="footer">
+    <p>
+      Prices and sales come from the <a href="https://www.albion-online-data.com/" rel="noopener">Albion Online Data Project</a>,
+      which players upload. It is partial and can lag by a few days. Recipes come from
+      <a href="https://github.com/ao-data/ao-bin-dumps" rel="noopener">ao-bin-dumps</a>.
+      Results are estimates, never a guarantee: always test with a small batch.
+    </p>
+    <p>
+      Also available as an AI agent skill and a command-line tool:
+      <a href="https://github.com/Omar-Elwazeery/albion-craft-market-scout" rel="noopener">source on GitHub</a>.
+      Not affiliated with Albion Online or Sandbox Interactive.
+      <span id="data-built"></span>
+    </p>
+  </footer>
+</body>
+</html>

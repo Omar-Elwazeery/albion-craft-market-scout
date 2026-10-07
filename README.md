@@ -1,18 +1,28 @@
 # Albion Online Craft Market Scout
 
-An AI agent skill that finds Albion Online crafts that make silver and checks them against live market data before recommending a small test batch.
+Finds Albion Online crafts that make silver and checks them against live market data before recommending a small test batch.
 
-It follows the open [Agent Skills](https://agentskills.io/specification) format, so the same folder works in Claude Code, Codex, Gemini CLI, Cursor, GitHub Copilot, OpenCode, Hermes Agent and other tools that read `SKILL.md`. Chat-only AIs can use it by pasting the instructions.
+**Try it in your browser:** https://omar-elwazeery.github.io/albion-craft-market-scout/
 
-## What is in the folder
+It comes in three forms that share the same math:
+
+- **Web app:** scan the market or check one item. Nothing to install.
+- **AI agent skill:** follows the open [Agent Skills](https://agentskills.io/specification) format, so the same folder works in Claude Code, Codex, Gemini CLI, Cursor, GitHub Copilot, OpenCode, Hermes Agent and other tools that read `SKILL.md`. Chat-only AIs can use it by pasting the instructions.
+- **Command-line tool:** `albion_scout.py`, Python 3.8+ with no packages.
+
+## What is in the repo
 
 ```
-albion-craft-market-scout/
-  SKILL.md                     instructions the AI reads
-  scripts/albion_scout.py      optional helper: scan, evaluate, prices, history (Python 3.8+, no packages)
-  references/economics.md      fees, return rates, city bonuses, transport, with sources
-  references/data-sources.md   price API and recipe data details
+albion-craft-market-scout/       the skill: copy this folder to install it
+  SKILL.md                       instructions the AI reads
+  scripts/albion_scout.py        helper: scan, evaluate, prices, history
+  references/economics.md        fees, return rates, city bonuses, transport, with sources
+  references/data-sources.md     price API and recipe data details
   references/report-template.md  shape of the final answer
+web/                             the web app (plain HTML, CSS and JavaScript)
+  core.js                        the profit math, ported line by line from albion_scout.py
+tests/parity/                    checks that core.js and albion_scout.py give the same results
+.github/workflows/pages.yml      daily build and publish to GitHub Pages
 ```
 
 ## Install
@@ -58,6 +68,24 @@ python scripts/albion_scout.py search "druid robe"
 ```
 
 The first run downloads recipe data (about 40 MB) and caches it for 7 days in `~/.cache/albion-craft-market-scout` (override with `--cache-dir` or `ALBION_SCOUT_CACHE`).
+
+## Work on the web app
+
+The page has no build step. It needs a recipe index that the Python script exports:
+
+```bash
+python albion-craft-market-scout/scripts/albion_scout.py export-index --out web/data/index.json
+python albion-craft-market-scout/scripts/albion_scout.py scan --json --top 25 > web/data/sample-scan.json
+python -m http.server 8765 --directory web      # then open http://127.0.0.1:8765
+```
+
+If you change the math in `albion_scout.py`, make the same change in `web/core.js`, then run the parity test (needs Node 18+):
+
+```bash
+python tests/parity/run.py
+```
+
+It replays a saved market sample (`tests/parity/fixture.json.gz`) through both versions and fails on any difference. `tests/parity/make_fixture.py` captures a fresh sample. The Pages workflow runs the same test before every publish.
 
 ## When the game changes
 
