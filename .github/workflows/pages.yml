@@ -1,43 +1,113 @@
 name: Build and publish the web app
 
-# Rebuilds the recipe index from the latest game data, checks that the
-# JavaScript and Python versions still agree, refreshes the example scan,
-# and publishes web/ to GitHub Pages.
+# Every 30 minutes: snapshot the market on all three servers and publish the
+# page, so visitors see current results without scanning. Every run also
+# rebuilds the recipe index, checks the constants against the latest game
+# data, and runs the tests; any failure stops the deploy and the last good
+# site stays up. The first run of each UTC day also logs that day's pilots to
+# the scan-log branch and rescores the track record.
 on:
   push:
     branches: [main]
   schedule:
-    - cron: "17 4 * * *"   # daily, so the example scan and recipes stay current
+    - cron: "7,37 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      daily: ${{ steps.daily.outputs.daily }}
     steps:
       - uses: actions/checkout@v5
+
+      - name: Week number for the recipe cache
+        id: week
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/albion-craft-market-scout
+          key: recipes-${{ steps.week.outputs.week }}
 
       - name: Build the recipe index
         run: python3 albion-craft-market-scout/scripts/albion_scout.py export-index --out web/data/index.json
 
-      - name: Check that Python and JavaScript give the same results
+      - name: Check the constants against the latest game data
+        run: python3 albion-craft-market-scout/scripts/albion_scout.py check-game-data --out web/data/checks.json
+
+      - name: Hand-checked math, Python and JavaScript
+        run: python3 tests/golden/run.py
+
+      - name: Python and JavaScript agree on real market data
         run: python3 tests/parity/run.py
 
-      - name: Run the example scan shown on first visit
-        # A failed scan only means the page opens without example rows.
-        run: |
-          python3 albion-craft-market-scout/scripts/albion_scout.py scan --json --top 25 > web/data/sample-scan.json \
-            || echo '{}' > web/data/sample-scan.json
-
       - uses: actions/configure-pages@v5
+        id: pages
+
+      - name: Check out the scan log
+        uses: actions/checkout@v5
+        continue-on-error: true   # the branch does not exist before the first daily run
+        with:
+          ref: scan-log
+          path: scan-log
+
+      - name: Is this the first run today?
+        id: daily
+        run: |
+          if [ -f "scan-log/$(date -u +%F)-europe.json" ]; then daily=false; else daily=true; fi
+          echo "daily=$daily" >> "$GITHUB_OUTPUT"
+
+      - name: Snapshot the market on every server
+        env:
+          SITE: ${{ steps.pages.outputs.base_url }}
+          DAILY: ${{ steps.daily.outputs.daily }}
+        # A failed server keeps its last published snapshot, so one bad run never blanks the page.
+        run: |
+          mkdir -p log
+          for s in europe west east; do
+            (
+              log=""
+              if [ "$DAILY" = true ]; then log="--log-out log/$(date -u +%F)-$s.json"; fi
+              python3 albion-craft-market-scout/scripts/albion_scout.py snapshot --server "$s" $log \
+                || { echo "::warning::$s snapshot failed; keeping the published one"; \
+                     curl -fsS "$SITE/data/live-$s.json" -o "web/data/live-$s.json" || true; }
+            ) &
+          done
+          wait
+
+      - name: Track record
+        env:
+          SITE: ${{ steps.pages.outputs.base_url }}
+          DAILY: ${{ steps.daily.outputs.daily }}
+        run: |
+          for s in europe west east; do
+            out="web/data/track-record-$s.json"
+            if [ "$DAILY" = true ] && [ -d scan-log ]; then
+              python3 albion-craft-market-scout/scripts/albion_scout.py backtest --server "$s" --log-dir scan-log --out "$out" \
+                || curl -fsS "$SITE/data/$(basename "$out")" -o "$out" || true
+            else
+              curl -fsS "$SITE/data/$(basename "$out")" -o "$out" || true
+            fi
+          done
+
+      - name: Keep today's pilots for the log job
+        if: steps.daily.outputs.daily == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-log
+          path: log/
+          if-no-files-found: ignore
 
       - uses: actions/upload-pages-artifact@v4
         with:
@@ -46,9 +116,39 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # Only this job can write to the repo, and only to the scan-log branch.
+  log:
+    needs: [build, deploy]
+    if: needs.build.outputs.daily == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: scan-log
+          path: new
+
+      - name: Add today's pilots to the scan-log branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls new/*.json > /dev/null 2>&1 || { echo "No pilots logged today."; exit 0; }
+          git init -q log && cd log
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git fetch -q --depth=1 origin scan-log; then git checkout -q -b scan-log FETCH_HEAD; else git checkout -q --orphan scan-log; fi
+          cp ../new/*.json .
+          git add -- *.json
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Log pilots for $(date -u +%F)"
+          git push -q origin scan-log

@@ -1,0 +1,187 @@
+{
+ "about": [
+  "Hand-checked cases for tests/golden/run.py. Expected numbers come from the formulas in",
+  "references/economics.md worked out by hand, not from the scout's code.",
+  "quotes: [item, city, lowest ask, ask age h, highest bid, bid age h]; null price = none; null age with a price = AODP's 0001-01-01 date.",
+  "history: [item, city, [[from days ago, to days ago, units each day, avg price], ...]]; 1 day ago is the latest full day.",
+  "Each case starts from `base` and replaces rows with the same item and city."
+ ],
+ "now": "2026-10-08T12:00:00+00:00",
+ "base": {
+  "quotes": [
+   ["T4_CLOTH", "Lymhurst", 300, 1, null, null],
+   ["T4_LEATHER", "Martlock", 400, 2, null, null],
+   ["T4_BAG", "Lymhurst", 9000, 1, 7000, 1]
+  ],
+  "history": [
+   ["T4_BAG", "Lymhurst", [[14, 1, 20, 8500]]],
+   ["T4_CLOTH", "Lymhurst", [[14, 1, 1000, 300]]],
+   ["T4_LEATHER", "Martlock", [[14, 1, 500, 400]]]
+  ]
+ },
+ "cases": [
+  {"name": "bag: every check passes", "item": "T4_BAG", "check_limits": true,
+   "why": "Brecilien specializes in bags: 18% + 15% bonus, return rate 0.33/1.33. Raw 8x300 + 8x400 = 5,600; returned 1,389.47; station fee 256 x 0.1125 x 1000/100 = 288; cost 4,498.53. Sale price min(ask 9,000, avg 8,500) = 8,500, net x 0.895 = 7,607.50. Test batch ceil(5% x 20/day) = 1 craft costing 5,600 + 288. Limits hold every other price and solve for a 10% margin.",
+   "expect": {"verdict": "pilot", "craft_city": "Brecilien", "rrr": 0.2481203008, "raw": 5600, "returned": 1389.4736842105,
+              "station_fee": 288, "cost": 4498.5263157895, "sale.city": "Lymhurst", "sale.mode": "sell order", "sale.price": 8500,
+              "revenue": 7607.5, "profit": 3108.9736842105, "margin": 0.6911093692, "pilot_crafts": 1, "pilot_capital": 5888,
+              "daily_capacity": 6217.9473684211, "sell_limit": 5528.9150249926, "breakeven_price": 5026.286386357,
+              "lines.T4_CLOTH.buy_limit": 701.8898863636, "lines.T4_LEATHER.buy_limit": 801.8898863636,
+              "sale.hist.units7": 140, "sale.hist.days7": 7, "sale.hist.window_end": "2026-10-07", "sale.hist.quiet_days": 0},
+   "reasons": []},
+
+  {"name": "bag: no sales data for 4 days while the city has data", "item": "T4_BAG",
+   "history": [["T4_BAG", "Lymhurst", [[14, 5, 20, 8500]]]],
+   "why": "Lymhurst cloth has data through yesterday, so the bag's 7-day window is Oct 1-7 and holds only Oct 1-3: 60 units on 3 days.",
+   "expect": {"verdict": "watch", "sale.hist.units7": 60, "sale.hist.days7": 3, "sale.hist.window_end": "2026-10-07",
+              "sale.hist.last_sale": "2026-10-03", "sale.hist.quiet_days": 4, "sale.hist.lag_days": 0},
+   "reasons_include": ["history covers 3 of 7 days", "no sales data in Lymhurst since 2026-10-03, 4 days before that city's latest data"]},
+
+  {"name": "bag: whole city feed 4 days behind is only a note", "item": "T4_BAG",
+   "history": [["T4_BAG", "Lymhurst", [[14, 5, 20, 8500]]], ["T4_CLOTH", "Lymhurst", [[14, 5, 1000, 300]]]],
+   "why": "Every Lymhurst series ends Oct 3 while Martlock runs to Oct 7: the window is Sep 27 - Oct 3, full, and the lag is noted.",
+   "expect": {"verdict": "pilot", "sale.hist.units7": 140, "sale.hist.days7": 7, "sale.hist.lag_days": 4, "sale.hist.quiet_days": 0},
+   "reasons_include": ["history for Lymhurst ends 2026-10-03, 4 days behind other cities"]},
+
+  {"name": "bag: whole city feed 5 days behind is a watch", "item": "T4_BAG",
+   "history": [["T4_BAG", "Lymhurst", [[14, 6, 20, 8500]]], ["T4_CLOTH", "Lymhurst", [[14, 6, 1000, 300]]]],
+   "expect": {"verdict": "watch", "sale.hist.lag_days": 5},
+   "reasons_include": ["sales history for Lymhurst is stale: ends 2026-10-02, 5 days behind other cities"]},
+
+  {"name": "bag: 9.9% margin is a watch", "item": "T4_BAG", "opts": {"station_fee": 2712},
+   "why": "Cost 5,600 - 1,389.47 + 2,712 = 6,922.53; margin 7,607.50 / 6,922.53 - 1 = 9.89%.",
+   "expect": {"verdict": "watch", "cost": 6922.5263157895, "margin": 0.0989485129},
+   "reasons_include": ["margin 9.9% below 10.0%"]},
+
+  {"name": "bag: 10.1% margin passes", "item": "T4_BAG", "opts": {"station_fee": 2700},
+   "expect": {"verdict": "pilot", "cost": 6910.5263157895, "margin": 0.1008568165}, "reasons": []},
+
+  {"name": "bag: 5.0 sold a day passes", "item": "T4_BAG",
+   "history": [["T4_BAG", "Lymhurst", [[14, 1, 5, 8500]]]],
+   "expect": {"verdict": "pilot", "sale.hist.per_day7": 5, "pilot_crafts": 1}, "reasons": []},
+
+  {"name": "bag: 4.9 sold a day is a watch", "item": "T4_BAG",
+   "history": [["T4_BAG", "Lymhurst", [[7, 2, 5, 8500], [1, 1, 4, 8500]]]],
+   "why": "34 units in 7 days = 4.86 a day.",
+   "expect": {"verdict": "watch", "sale.hist.units7": 34},
+   "reasons_include": ["thin volume: 4.9/day in Lymhurst"]},
+
+  {"name": "bag: data on 4 of 7 days passes", "item": "T4_BAG",
+   "history": [["T4_BAG", "Lymhurst", [[4, 1, 40, 8500]]]],
+   "expect": {"verdict": "pilot", "sale.hist.days7": 4, "sale.hist.units7": 160}, "reasons": []},
+
+  {"name": "bag: a cheap input is costed at its 7-day average", "item": "T4_BAG",
+   "quotes": [["T4_CLOTH", "Lymhurst", 150, 1, null, null]],
+   "why": "150 is below 70% of the 300 average, so the cost uses 300 and matches the first case.",
+   "expect": {"verdict": "pilot", "cost": 4498.5263157895, "lines.T4_CLOTH.unit": 150, "lines.T4_CLOTH.cost_unit": 300,
+              "lines.T4_CLOTH.buy_limit": 701.8898863636},
+   "reasons_include": ["input T4_CLOTH ask 150 is far below its 7-day avg 300 in Lymhurst; costed at the average"]},
+
+  {"name": "bag: sale quote older than 12 h is a watch", "item": "T4_BAG",
+   "quotes": [["T4_BAG", "Lymhurst", 9000, 13, 7000, 13]],
+   "expect": {"verdict": "watch"}, "reasons_include": ["sale price quote is 13.0h old (limit 12h)"]},
+
+  {"name": "bag: main input quote older than 12 h is a watch", "item": "T4_BAG",
+   "quotes": [["T4_LEATHER", "Martlock", 400, 13, null, null]],
+   "why": "Leather costs 3,200 a craft against cloth's 2,400, so it is the main input.",
+   "expect": {"verdict": "watch"}, "reasons_include": ["main input T4_LEATHER quote is 13.0h old (limit 12h)"]},
+
+  {"name": "bag: a smaller input 8 h old is only a note", "item": "T4_BAG",
+   "quotes": [["T4_CLOTH", "Lymhurst", 300, 8, null, null]],
+   "expect": {"verdict": "pilot"}, "reasons_include": ["oldest quote 8.0h (aging)"]},
+
+  {"name": "bag: a city with steady sales beats a pricier thin one", "item": "T4_BAG",
+   "quotes": [["T4_BAG", "Martlock", 9500, 1, null, null]],
+   "history": [["T4_BAG", "Martlock", [[14, 1, 2, 9500]]]],
+   "why": "Martlock nets 8,502.50 but sells 2 a day; Lymhurst nets 7,607.50, sells 20 a day and still clears 10%.",
+   "expect": {"verdict": "pilot", "sale.city": "Lymhurst", "profit": 3108.9736842105}, "reasons": []},
+
+  {"name": "bag: an ask far above the average is a watch", "item": "T4_BAG",
+   "quotes": [["T4_BAG", "Lymhurst", 12000, 1, 7000, 1]],
+   "why": "12,000 is 41% above the 8,500 average; the sale uses 8,500.",
+   "expect": {"verdict": "watch", "sale.price": 8500, "profit": 3108.9736842105},
+   "reasons_include": ["current price 12,000 is >30% from 7-day avg 8,500; used the lower"]},
+
+  {"name": "bag: a 0001-01-01 date means no price", "item": "T4_BAG",
+   "quotes": [["T4_LEATHER", "Martlock", 400, null, null, null]],
+   "expect": {"verdict": "avoid", "profit": null, "missing": ["T4_LEATHER"]},
+   "reasons_include": ["no fresh price for: T4_LEATHER"]},
+
+  {"name": "bag: no sales history is an avoid", "item": "T4_BAG", "remove_history": [["T4_BAG", "Lymhurst"]],
+   "expect": {"verdict": "avoid"},
+   "reasons_include": ["no observed sales in Lymhurst in the last 7 days; demand unverified"]},
+
+  {"name": "bag: quotes only, as in scan stage 1", "item": "T4_BAG", "use_history": false,
+   "why": "Without history the sale is the lowest ask: 9,000 x 0.895 = 8,055.",
+   "expect": {"sale.price": 9000, "profit": 3556.4736842105, "verdict": "avoid"}},
+
+  {"name": "bag: red-zone sale shows the safe route", "item": "T4_BAG",
+   "quotes": [["T4_BAG", "Black Market", null, null, 10000, 1]],
+   "history": [["T4_BAG", "Black Market", [[14, 1, 30, 10000]]]],
+   "why": "The Black Market buy order nets 10,000 x 0.92 = 9,200 (no setup fee). Without it, Lymhurst as in the first case.",
+   "expect": {"verdict": "pilot", "sale.city": "Black Market", "sale.mode": "instant sell to buy order",
+              "profit": 4701.4736842105, "margin": 1.0451141894, "safe_alt.sale": "Lymhurst (sell order)",
+              "safe_alt.profit": 3108.9736842105, "safe_alt.verdict": "pilot"},
+   "reasons_include": ["route risk: red zones (full-loot PvP) to reach the Black Market (in Caerleon)"]},
+
+  {"name": "bag: budget caps the test batch", "item": "T4_BAG", "opts": {"budget": 20000},
+   "history": [["T4_BAG", "Lymhurst", [[14, 1, 200, 8500]]]],
+   "why": "5% of 200 a day = 10 crafts, but 20,000 buys only 3 at 5,888 each.",
+   "expect": {"verdict": "pilot", "pilot_crafts": 3, "pilot_capital": 17664}},
+
+  {"name": "potion: makes 5 per craft", "item": "T4_POTION_TEST",
+   "quotes": [["T4_HERB", "Brecilien", 50, 1, null, null], ["T3_EGG", "Martlock", 100, 1, null, null],
+              ["T4_POTION_TEST", "Brecilien", 400, 1, null, null]],
+   "history": [["T4_POTION_TEST", "Brecilien", [[14, 1, 500, 420]]], ["T4_HERB", "Brecilien", [[14, 1, 5000, 50]]],
+               ["T3_EGG", "Martlock", [[14, 1, 5000, 100]]]],
+   "why": "Raw 24x50 + 6x100 = 1,800; returned at 0.33/1.33; fee 40 x 5 x 0.1125 x 10 = 225. Revenue 5 x 400 x 0.895 = 1,790. Test batch ceil(5% x 500 / 5) = 5 crafts of 2,025.",
+   "expect": {"verdict": "pilot", "craft_city": "Brecilien", "amount": 5, "raw": 1800, "returned": 446.6165413534,
+              "station_fee": 225, "cost": 1578.3834586466, "revenue": 1790, "profit": 211.6165413534,
+              "margin": 0.1340716923, "profit_unit": 42.3233082707, "pilot_crafts": 5, "pilot_capital": 10125}},
+
+  {"name": "sword: the artifact gets no resource return", "item": "T4_SWORD_ART",
+   "quotes": [["T4_METALBAR", "Thetford", 200, 1, null, null], ["T4_ARTEFACT_SWORD", "Lymhurst", 5000, 1, null, null],
+              ["T4_SWORD_ART", "Lymhurst", 12000, 1, null, null]],
+   "history": [["T4_SWORD_ART", "Lymhurst", [[14, 1, 10, 11000]]], ["T4_METALBAR", "Thetford", [[14, 1, 1000, 200]]],
+               ["T4_ARTEFACT_SWORD", "Lymhurst", [[14, 1, 20, 5000]]]],
+   "why": "Only the 3,200 of bars returns: 3,200 x 0.33/1.33. Item value 16 x 16 (artifact value unknown) gives a 288 fee. The artifact limit gains the whole slack because none of it comes back.",
+   "expect": {"verdict": "pilot", "craft_city": "Lymhurst", "raw": 8200, "returnable_raw": 3200, "returned": 793.984962406,
+              "station_fee": 288, "cost": 7694.015037594, "profit": 2150.984962406, "margin": 0.2795659941,
+              "lines.T4_ARTEFACT_SWORD.buy_limit": 6255.984962406, "lines.T4_METALBAR.buy_limit": 304.40375},
+   "fee_note_include": "some input values unknown"},
+
+  {"name": "faction cape: no specialization, no returns, no item value", "item": "T4_CAPE_FACTION",
+   "quotes": [["T4_CAPE", "Martlock", 2000, 1, null, null], ["T4_TOKEN", "Thetford", 30000, 1, null, null],
+              ["T4_CAPE_FACTION", "Martlock", 40000, 1, null, null]],
+   "history": [["T4_CAPE_FACTION", "Martlock", [[14, 1, 10, 40000]]], ["T4_TOKEN", "Thetford", [[14, 1, 50, 30000]]],
+               ["T4_CAPE", "Martlock", [[14, 1, 100, 2000]]]],
+   "why": "Craft where most silver is spent (Thetford). Nothing returns, and with no item value the fee is left for the player to check.",
+   "expect": {"verdict": "pilot", "craft_city": "Thetford", "rrr": 0.1525423729, "returned": 0, "station_fee": null,
+              "cost": 32000, "profit": 3800, "margin": 0.11875,
+              "city_note": "no city specialization; any Royal city gives the same return rate"},
+   "fee_note_include": "unknown item value"},
+
+  {"name": "planks: refining gets the 40% city bonus", "item": "T5_PLANKS",
+   "quotes": [["T5_WOOD", "Fort Sterling", 100, 1, null, null], ["T4_PLANKS", "Fort Sterling", 150, 1, null, null],
+              ["T5_PLANKS", "Fort Sterling", 500, 1, null, null]],
+   "history": [["T5_PLANKS", "Fort Sterling", [[14, 1, 1000, 520]]], ["T5_WOOD", "Fort Sterling", [[14, 1, 1000, 100]]],
+               ["T4_PLANKS", "Fort Sterling", [[14, 1, 1000, 150]]]],
+   "why": "18% + 40% bonus: return rate 0.58/1.58. Fee 32 x 0.1125 x 10 = 36.",
+   "expect": {"verdict": "pilot", "craft_city": "Fort Sterling", "rrr": 0.3670886076, "raw": 450, "returned": 165.1898734177,
+              "station_fee": 36, "cost": 320.8101265823, "profit": 126.6898734177, "margin": 0.3949060922}},
+
+  {"name": "enchanted bag: @1 IDs throughout", "item": "T4_BAG@1",
+   "quotes": [["T4_CLOTH_LEVEL1@1", "Lymhurst", 600, 1, null, null], ["T4_LEATHER_LEVEL1@1", "Martlock", 700, 1, null, null],
+              ["T4_BAG@1", "Lymhurst", 20000, 1, null, null]],
+   "history": [["T4_BAG@1", "Lymhurst", [[14, 1, 10, 21000]]], ["T4_CLOTH_LEVEL1@1", "Lymhurst", [[14, 1, 100, 600]]],
+               ["T4_LEATHER_LEVEL1@1", "Martlock", [[14, 1, 100, 700]]]],
+   "why": "Item value 16 x 32 = 512, fee 576.",
+   "expect": {"verdict": "pilot", "raw": 10400, "station_fee": 576, "cost": 8395.5488721805, "profit": 9504.4511278195,
+              "margin": 1.1320821631}},
+
+  {"name": "mount: a recipe needing faction points is an avoid", "item": "T4_MOUNT_X",
+   "quotes": [["T4_HIDE", "Martlock", 100, 1, null, null], ["T4_MOUNT_X", "Martlock", 5000, 1, null, null]],
+   "history": [["T4_MOUNT_X", "Martlock", [[14, 1, 10, 5000]]]],
+   "expect": {"verdict": "avoid"}, "reasons_include": ["needs non-silver inputs: 3000 FACTION_STEPPE"]}
+ ]
+}

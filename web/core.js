@@ -48,13 +48,12 @@ export function makeCore(data) {
 
   function summarizeHistory(rows, startDay) {
     const series = new Map();
-    let latest = null;
     for (const row of rows) {
       const city = CITY_BY_NORM.get(normCity(row.location));
       if (!city) continue;
       const k = key(row.item_id, city);
-      if (!series.has(k)) series.set(k, new Map());
-      const daysMap = series.get(k);
+      if (!series.has(k)) series.set(k, { city, days: new Map() });
+      const daysMap = series.get(k).days;
       for (const d of row.data || []) {
         const ts = parseTs(d.timestamp);
         if (ts === null) continue;
@@ -64,15 +63,22 @@ export function makeCore(data) {
         const avg = d.avg_price || 0;
         const prev = daysMap.get(day) || [0, 0];
         daysMap.set(day, [prev[0] + cnt, prev[1] + cnt * avg]);
-        if (latest === null || day > latest) latest = day;
       }
     }
-    // Each city's scans lag by a different number of days, so every series
-    // gets its own 7/14-day window ending at its latest bucket.
+    // History arrives when a player opens an item's price chart, so each city's
+    // data runs to a different day. Every item's window ends on its city's latest
+    // day, and days without data inside it count as zero sales.
+    const cityEnd = new Map();
+    for (const { city, days } of series.values()) {
+      for (const day of days.keys()) if (!cityEnd.has(city) || day > cityEnd.get(city)) cityEnd.set(city, day);
+    }
+    const latest = [...cityEnd.values()].reduce((a, b) => (a === null || b > a ? b : a), null);
     const summaries = new Map();
-    for (const [k, daysMap] of series) {
+    for (const [k, { city, days: daysMap }] of series) {
       if (daysMap.size === 0) continue;
-      const endDay = [...daysMap.keys()].reduce((a, b) => (b > a ? b : a));
+      const endDay = cityEnd.get(city);
+      const sold = [...daysMap].filter(([, v]) => v[0] > 0).map(([d]) => d);
+      const lastSale = sold.length ? sold.reduce((a, b) => (b > a ? b : a)) : null;
       const agg = (n) => {
         const window = new Set();
         for (let i = 0; i < n; i++) window.add(addDays(endDay, -i));
@@ -91,6 +97,7 @@ export function makeCore(data) {
         units7: u7, per_day7: u7 / 7, vwap7, days7: cov7,
         units14: u14, per_day14: u14 / 14, vwap14, days14: cov14,
         window_end: endDay, lag_days: daysBetween(endDay, latest),
+        last_sale: lastSale, quiet_days: lastSale === null ? null : daysBetween(lastSale, endDay),
       });
     }
     return summaries;
@@ -168,6 +175,45 @@ export function makeCore(data) {
     return options;
   }
 
+  // Sales history strong enough for a pilot: volume, coverage, and recent data.
+  function demandOk(h) {
+    return !!h && h.per_day7 >= E.min_daily_units && h.days7 >= E.min_coverage_days &&
+      h.quiet_days !== null && h.quiet_days < E.quiet_days;
+  }
+
+  // Best net price, preferring cities that pass the demand checks and still clear
+  // min_margin (net per item of at least minNet), so a slightly cheaper city with
+  // real sales beats a pricier one without them.
+  // Once history is loaded, only cities with observed sales can be the pick:
+  // an ask nobody has paid for is not revenue.
+  function pickSale(optsList, hist, minNet) {
+    let pool = optsList;
+    if (hist !== null) {
+      const seen = optsList.filter((o) => o.hist && o.hist.units7 > 0);
+      const good = seen.filter((o) => demandOk(o.hist) && minNet !== null && o.net >= minNet);
+      pool = good.length ? good : seen.length ? seen : optsList;
+    }
+    return maxBy(pool, (o) => o.net);
+  }
+
+  // Prices the player can check in game: the most each input may cost, and the
+  // least the output may sell for, with every other number fixed, for min_margin.
+  function addLimits(res) {
+    for (const l of res.lines) l.buy_limit = null;
+    res.sell_limit = null;
+    res.breakeven_price = null;
+    if (res.profit === null) return;
+    const cost = res.cost;
+    const costMax = res.revenue / (1 + E.min_margin);
+    for (const l of res.lines) {
+      const kept = l.returnable ? 1 - (res.rrr || 0) : 1;
+      l.buy_limit = l.cost_unit + (costMax - cost) / (l.count * kept);
+    }
+    const keep = 1 - res.tax - (res.sale.mode === "sell order" ? E.setup_fee : 0);
+    res.sell_limit = cost * (1 + E.min_margin) / (res.amount * keep);
+    res.breakeven_price = cost / (res.amount * keep);
+  }
+
   function evaluate(iid, quotes, hist, opts, nested = false) {
     const item = data.items[iid];
     if (!item) throw new Error("No recipe for '" + iid + "'.");
@@ -184,10 +230,13 @@ export function makeCore(data) {
         if (q === null) missing.push(inp);
         const ih = q && hist ? hist.get(key(inp, q.city)) || null : null;
         const cheap = ih && ih.vwap7 && q.price < (1 - E.outlier_band) * ih.vwap7 ? ih.vwap7 : null;
+        // An ask far below what the input really trades at may be one small
+        // order, so the cost uses the 7-day average instead.
+        const costUnit = q ? cheap || q.price : null;
         lines.push({
           id: inp, name: nameOf(inp), count: cnt, returnable,
-          unit: q ? q.price : null, city: q ? q.city : null, age_h: q ? q.age_h : null,
-          ext: q ? q.price * cnt : null, cheap_vs_avg: cheap,
+          unit: q ? q.price : null, cost_unit: costUnit, city: q ? q.city : null, age_h: q ? q.age_h : null,
+          ext: q ? costUnit * cnt : null, cheap_vs_avg: cheap,
         });
       }
       const raw = sum(lines.filter((l) => l.ext !== null).map((l) => l.ext));
@@ -224,14 +273,8 @@ export function makeCore(data) {
       const want = canonicalCity(opts.sell_city);
       optsList = optsList.filter((o) => o.city === want);
     }
-    // Once history is loaded, only cities with observed sales can be the pick;
-    // an ask nobody has paid for is not revenue.
-    let pool = optsList;
-    if (hist !== null) {
-      const seen = optsList.filter((o) => o.hist && o.hist.units7 > 0);
-      if (seen.length) pool = seen;
-    }
-    const sale = maxBy(pool, (o) => o.net);
+    const sale = pickSale(optsList, hist,
+      best.missing.length ? null : best.cost * (1 + E.min_margin) / best.amount);
     if (craftCity === null) {
       const spend = new Map();
       for (const l of best.lines) {
@@ -256,6 +299,7 @@ export function makeCore(data) {
     } else {
       Object.assign(res, { revenue: null, profit: null, profit_unit: null, margin: null, breakeven_cap: null });
     }
+    addLimits(res);
     [res.verdict, res.reasons] = verdict(res);
     const h = sale ? sale.hist : null;
     res.daily_capacity = null;
@@ -295,8 +339,9 @@ export function makeCore(data) {
     return cities;
   }
 
+  // [verdict, reasons]. Any failed check is a reason; only hard ones block a pilot.
   function verdict(r) {
-    let reasons = [];
+    const reasons = [];
     if (r.missing.length) reasons.push("no fresh price for: " + r.missing.join(", "));
     if (r.extra.length) reasons.push("needs non-silver inputs: " + r.extra.join("; "));
     if (r.sale === null) reasons.push("no fresh sell price");
@@ -308,35 +353,49 @@ export function makeCore(data) {
     if (h === null || h.units7 === 0) {
       return ["avoid", ["no observed sales in " + sale.city + " in the last 7 days; demand unverified"]];
     }
-    if (r.margin !== null && r.margin < E.min_margin) {
-      reasons.push("margin " + pct(r.margin) + " below " + pct(E.min_margin));
+    const hard = [];
+    const add = (text, blocks = true) => {
+      reasons.push(text);
+      if (blocks) hard.push(text);
+    };
+    if (r.margin !== null && r.margin < E.min_margin) add("margin " + pct(r.margin) + " below " + pct(E.min_margin));
+    if (h.per_day7 < E.min_daily_units) add("thin volume: " + h.per_day7.toFixed(1) + "/day in " + sale.city);
+    if (h.days7 < E.min_coverage_days) add("history covers " + h.days7 + " of 7 days");
+    if (h.quiet_days !== null && h.quiet_days >= E.quiet_days) {
+      add("no sales data in " + sale.city + " since " + h.last_sale + ", " + h.quiet_days +
+        " days before that city's latest data");
     }
-    if (h.per_day7 < E.min_daily_units) reasons.push("thin volume: " + h.per_day7.toFixed(1) + "/day in " + sale.city);
-    if (h.days7 < E.min_coverage_days) reasons.push("history covers " + h.days7 + " of 7 days");
-    if ((h.lag_days || 0) >= 5) {
-      reasons.push("sales history for " + sale.city + " is stale: ends " + h.window_end + ", " +
+    if (h.lag_days >= E.city_lag_hard) {
+      add("sales history for " + sale.city + " is stale: ends " + h.window_end + ", " +
         h.lag_days + " days behind other cities");
-    } else if ((h.lag_days || 0) >= 3) {
-      reasons.push("history for " + sale.city + " ends " + h.window_end + ", " + h.lag_days + " days behind other cities");
+    } else if (h.lag_days >= E.city_lag_note) {
+      add("history for " + sale.city + " ends " + h.window_end + ", " + h.lag_days + " days behind other cities", false);
     }
     if (sale.outlier) {
       const quoted = sale.mode.startsWith("instant") ? sale.bid : sale.ask;
-      reasons.push("current price " + fmt(quoted) + " is >" + Math.trunc(E.outlier_band * 100) +
+      add("current price " + fmt(quoted) + " is >" + Math.trunc(E.outlier_band * 100) +
         "% from 7-day avg " + fmt(sale.vwap7) + "; used the lower");
     }
     for (const l of r.lines) {
       if (l.cheap_vs_avg) {
-        reasons.push("input " + l.id + " ask " + fmt(l.unit) + " is far below its 7-day avg " +
-          fmt(l.cheap_vs_avg) + " in " + l.city + "; may be a small order");
+        add("input " + l.id + " ask " + fmt(l.unit) + " is far below its 7-day avg " +
+          fmt(l.cheap_vs_avg) + " in " + l.city + "; costed at the average", false);
       }
     }
-    const ages = r.lines.filter((l) => l.age_h !== null).map((l) => l.age_h).concat([sale.age_h]);
-    const oldest = Math.max(...ages);
-    if (oldest > E.fresh_hours) reasons.push("oldest quote " + ageText(oldest) + " (aging)");
+    const main = maxBy(r.lines, (l) => l.ext);
+    let staleKey = false;
+    if (sale.age_h > E.key_quote_hours) {
+      add("sale price quote is " + ageText(sale.age_h) + " old (limit " + E.key_quote_hours + "h)");
+      staleKey = true;
+    }
+    if (main.age_h > E.key_quote_hours) {
+      add("main input " + main.id + " quote is " + ageText(main.age_h) + " old (limit " + E.key_quote_hours + "h)");
+      staleKey = true;
+    }
+    const oldest = Math.max(...r.lines.map((l) => l.age_h), sale.age_h);
+    if (!staleKey && oldest > E.fresh_hours) add("oldest quote " + ageText(oldest) + " (aging)", false);
     const risks = [...new Set(routeCities(r).filter((c) => c in E.route_risk).map((c) => E.route_risk[c]))].sort();
-    if (risks.length) reasons.push("route risk: " + risks.join(", "));
-    const soft = ["oldest quote", "route risk", "history for", "input "];
-    const hard = reasons.filter((x) => !soft.some((s) => x.startsWith(s)));
+    if (risks.length) add("route risk: red zones (full-loot PvP) to reach " + risks.join(" and "), false);
     return [hard.length ? "watch" : "pilot", reasons];
   }
 
@@ -361,27 +420,67 @@ export function makeCore(data) {
     return inputs;
   }
 
-  // Stage 1 ranks on current quotes; stage 2 re-checks the best with sales history.
-  async function scan(scanOpts, opts, net, progress = () => {}) {
-    const ids = scanIds(scanOpts);
-    if (!ids.length) throw new Error("No craftable items match these filters.");
-    const inputs = inputsOf(ids);
-    progress({ stage: "prices", text: "Scanning " + ids.length + " items (" + inputs.size + " inputs)" });
-    const quotes = await net.fetchQuotes([...ids, ...inputs], E.sell_markets, progress);
+  // Items that clear the pre-filter on current quotes alone, best margin first.
+  function scanStage1(ids, quotes, opts, prefilterMargin) {
     const stage1 = [];
     for (const iid of ids) {
       const r = evaluate(iid, quotes, null, opts);
-      if (r.profit !== null && r.margin !== null && r.margin >= scanOpts.prefilterMargin) stage1.push(r);
+      if (r.profit !== null && r.margin !== null && r.margin >= prefilterMargin) stage1.push(r);
     }
     stage1.sort((a, b) => b.margin - a.margin);
-    const shortlist = stage1.slice(0, scanOpts.historyFor).map((r) => r.item);
-    progress({ stage: "history", text: stage1.length + " look profitable; checking sales history for " + shortlist.length });
-    const hist = shortlist.length ? await net.fetchHistory(shortlist, opts.sells, 14, progress) : new Map();
+    return stage1;
+  }
+
+  // Shortlist re-checked with sales history: still profitable, pilots first.
+  function scanFinal(shortlist, quotes, hist, opts) {
     let final = shortlist.map((iid) => evaluate(iid, quotes, hist, opts));
     final = final.filter((r) => r.profit !== null && r.profit > 0);
     const order = { pilot: 0, watch: 1, avoid: 2 };
     final.sort((a, b) => order[a.verdict] - order[b.verdict] || (b.daily_capacity || 0) - (a.daily_capacity || 0));
+    return final;
+  }
+
+  function scanSetup(scanOpts) {
+    const ids = scanIds(scanOpts);
+    if (!ids.length) throw new Error("No craftable items match these filters.");
+    return ids;
+  }
+
+  // Stage 1 ranks on current quotes; stage 2 re-checks the best with sales
+  // history for them and their inputs, so one cheap input order is caught.
+  async function scan(scanOpts, opts, net, progress = () => {}) {
+    const ids = scanSetup(scanOpts);
+    const inputs = inputsOf(ids);
+    progress({ stage: "prices", text: "Scanning " + ids.length + " items (" + inputs.size + " inputs)" });
+    const quotes = await net.fetchQuotes([...ids, ...inputs], E.sell_markets, progress);
+    const stage1 = scanStage1(ids, quotes, opts, scanOpts.prefilterMargin);
+    const shortlist = stage1.slice(0, scanOpts.historyFor).map((r) => r.item);
+    progress({ stage: "history", text: stage1.length + " look profitable; checking sales history for " + shortlist.length });
+    const locations = [...new Set([...opts.sells, ...opts.sources])].sort();
+    const hist = shortlist.length
+      ? await net.fetchHistory([...shortlist, ...inputsOf(shortlist)], locations, 14, progress) : new Map();
+    const final = scanFinal(shortlist, quotes, hist, opts);
     return { scanned: ids.length, profitable_on_quotes: stage1.length, results: final, quotes, hist };
+  }
+
+  // The same scan on data already loaded (the published snapshot): no requests.
+  function scanFromData(scanOpts, opts, quotes, hist) {
+    const ids = scanSetup(scanOpts);
+    const stage1 = scanStage1(ids, quotes, opts, scanOpts.prefilterMargin);
+    const shortlist = stage1.slice(0, scanOpts.historyFor).map((r) => r.item);
+    const final = scanFinal(shortlist, quotes, hist, opts);
+    return { scanned: ids.length, profitable_on_quotes: stage1.length, results: final, quotes, hist };
+  }
+
+  // Quotes and history from a snapshot written by `albion_scout.py snapshot`.
+  // Quote ages are measured from nowMs, so they keep growing until the next one.
+  function fromSnapshot(snap, nowMs) {
+    const { priceRows, historyRows, start } = decodeSnapshot(snap);
+    return {
+      quotes: parsePrices(priceRows, nowMs),
+      hist: summarizeHistory(historyRows, start),
+      generated: snap.generated, server: snap.server,
+    };
   }
 
   async function evaluateLive(iid, opts, net, progress = () => {}) {
@@ -412,8 +511,35 @@ export function makeCore(data) {
 
   return {
     E, data, key, nameOf, canonicalCity, parsePrices, summarizeHistory, evaluate, verdict,
-    sellOptions, routeCities, scan, scanIds, evaluateLive, defaultOpts,
+    sellOptions, routeCities, scan, scanIds, scanFromData, fromSnapshot, evaluateLive, defaultOpts,
   };
+}
+
+// Snapshot rows back into the AODP API's own shape, so the usual parsers read them.
+export function decodeSnapshot(snap) {
+  const base = Date.parse(snap.base + "Z");
+  const missing = "0001-01-01T00:00:00";
+  const stamp = (m) => new Date(base - m * 60000).toISOString().slice(0, 19);
+  const priceRows = [];
+  for (const [iid, rows] of Object.entries(snap.prices)) {
+    for (const [c, ask, askM, bid, bidM] of rows) {
+      priceRows.push({
+        item_id: iid, city: snap.cities[c], quality: 1,
+        sell_price_min: ask || 0, sell_price_min_date: ask ? stamp(askM) : missing,
+        buy_price_max: bid || 0, buy_price_max_date: bid ? stamp(bidM) : missing,
+      });
+    }
+  }
+  const historyRows = [];
+  for (const [iid, series] of Object.entries(snap.history)) {
+    for (const [c, days] of series) {
+      historyRows.push({
+        item_id: iid, location: snap.cities[c], quality: 1,
+        data: days.map(([d, n, p]) => ({ timestamp: addDays(snap.start, d) + "T00:00:00", item_count: n, avg_price: p })),
+      });
+    }
+  }
+  return { priceRows, historyRows, start: snap.start };
 }
 
 // ------------------------------------------------------------------ network
@@ -494,10 +620,11 @@ export function bindNet(core, net, nowFn = Date.now) {
       const rows = await net.fetchPriceRows(ids, locations, progress);
       return core.parsePrices(rows, nowFn());
     },
+    // Reference items ride along so each city's latest data day is known.
     async fetchHistory(ids, locations, days, progress) {
       const today = dayOf(nowFn());
       const start = addDays(today, -days);
-      const rows = await net.fetchHistoryRows(ids, locations, start, today, progress);
+      const rows = await net.fetchHistoryRows([...ids, ...core.E.reference_items], locations, start, today, progress);
       return core.summarizeHistory(rows, start);
     },
   };

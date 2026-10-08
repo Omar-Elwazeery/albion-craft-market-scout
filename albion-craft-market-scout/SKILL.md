@@ -4,7 +4,7 @@ description: Albion Online craft-profit scout. Finds crafts that make silver and
 license: MIT
 compatibility: Works in any AI agent. Best with internet access plus Python 3.8+ (standard library only) to run scripts/albion_scout.py. Without code execution, follow "Manual path".
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
   author: "Wezza"
   tags: "albion-online, crafting, markets, silver, prices"
 ---
@@ -41,9 +41,9 @@ Run the script from this skill's folder. It needs internet access and nothing ou
 2. **Apply the user's strategy if they gave one.** Turn a video or method into scan filters: categories, tiers, cities. Do not assume the item it showcased is the answer.
 3. **Verify the top 3-5 leads one at a time.** Run `python scripts/albion_scout.py evaluate ITEM_ID`. Add what you know: `--transport SILVER` (per craft), `--budget SILVER`, `--fee-per-100 N`, `--daily-bonus 0.10`, `--craft-city`, `--sell-city`.
 4. **Check the output yourself.** Profit must equal net revenue minus every cost. Confirm that non-returnable inputs got no return, the output count per craft is right, and the sale price is not the highest ask. Drop anything that fails "Decision rules".
-5. **Report** using [the report template](references/report-template.md). Show several candidates. Separate high-margin, low-volume crafts from lower-margin, high-volume ones, and red-zone routes from safe ones.
+5. **Report** using [the report template](references/report-template.md). Show several candidates. Separate high-margin, low-volume crafts from lower-margin, high-volume ones, and red-zone routes from safe ones. For each recommended craft, copy the "Pay at most" prices, the lowest sale price and the "Check in game before buying" list from `evaluate`: the data has no order sizes, so the player must confirm these in game before buying.
 
-Other commands: `search "master's bag"` finds IDs by name. `recipe T4_BAG@1` shows a recipe. `prices ID,ID` and `history ID` show raw quotes and sales. Add `--json` for structured output, `--server west` or `east` for other servers, `--premium` for 4% tax. Run any command with `--help` for all flags.
+Other commands: `search "master's bag"` finds IDs by name. `recipe T4_BAG@1` shows a recipe. `prices ID,ID` and `history ID` show raw quotes and sales. Add `--json` for structured output (it includes the AODP URLs used, for citing), `--server west` or `east` for other servers, `--premium` for 4% tax. Run any command with `--help` for all flags. The assumptions line says when the fee and bonus constants last matched the game data; `check-game-data` re-checks them.
 
 ### Manual path (no code execution)
 
@@ -55,7 +55,7 @@ Use this when you cannot run Python. URL details and response examples: [data so
 4. **Get sales.** Open `https://europe.albion-online-data.com/api/v2/stats/history/{OUTPUT_ID}.json?date={today minus 14 days}&end_date={today}&locations={sell cities}&qualities=1&time-scale=24`.
 5. **Compute** with the formulas below and apply "Decision rules".
 
-If you cannot open web pages either, give the user these exact URLs and ask them to paste the responses. They can also read prices from the in-game market, or run the same scan and item check in their browser at https://omar-elwazeery.github.io/albion-craft-market-scout/ and paste the results back.
+If you cannot open web pages either, give the user these exact URLs and ask them to paste the responses. They can also read prices from the in-game market, or open https://omar-elwazeery.github.io/albion-craft-market-scout/ in their browser: it shows the same scan from a market snapshot taken about every 30 minutes, and checks any one item live. They can paste the results back.
 
 ## Formulas (per craft)
 
@@ -72,7 +72,13 @@ sale price       = min(lowest ask, 7-day average sale price)         listing a s
 net revenue      = output count x sale price x (1 - 0.08 tax - 0.025 setup fee)   sell order
                  = output count x sale price x (1 - 0.08 tax)                     instant sell
 profit           = net revenue - total cost        margin = profit / total cost
+
+pay at most      = input's unit cost + (net revenue / 1.10 - total cost) / (quantity x kept)
+                   kept = 1 - return rate for a returnable input, 1 for one that never returns
+lowest sale price = total cost x 1.10 / (output count x (1 - tax - setup fee if a sell order))
 ```
+
+Each "pay at most" price keeps a 10% margin with every other price as quoted.
 
 Return rate without Focus: 15.25% in a Royal city, Caerleon or Brecilien; 24.8% where the city specializes in the item; 36.7% when refining in the resource's city. The daily bonus raises these (see economics). If transport cost is unknown, report the break-even cap: the most transport can cost before the craft loses money.
 
@@ -80,13 +86,16 @@ Return rate without Focus: 15.25% in a Royal city, Caerleon or Brecilien; 24.8% 
 
 | Check | Rule |
 |---|---|
-| Quote age | Up to 6 h is fresh. 6-24 h is usable but flagged. Missing or older: no price. |
-| Demand | At least 5 units sold per day in the sell city over its latest 7 days of history, with data on at least 4 of those days. |
+| Quote age | Up to 6 h is fresh. The sale price or the input that costs the most older than 12 h: watch. Other quotes 6-24 h: flagged. Missing or older than 24 h: no price. |
+| Sales window | AODP only gets history when a player opens an item's price chart, so each city's data ends on a different day. Use the 7 days ending on the sell city's latest history day across all items, and count days without data as zero sales. |
+| Demand | At least 5 units sold per day in the sell city over that window, with data on at least 4 of the 7 days. |
+| Quiet item | No sales data for the item in the sell city for 3 or more days while the city has newer data: watch. |
 | No observed sales | Avoid. You cannot recommend an item on unseen demand. |
-| Stale history | Sell city's history ends 5 or more days before other cities': watch. |
+| Stale city | The sell city's whole history ends 3-4 days before other cities': flag it. 5 or more days: watch. |
+| Sell city | Prefer the best-paying city that passes the demand checks and still clears 10%. Otherwise use the best-paying city with sales. |
 | Margin | At least 10% after every known cost. |
-| Outlier price | Current ask or buy order more than 30% away from the 7-day average: use the lower number and flag it. |
-| Cheap input | An input ask far below its own 7-day average may be one small order. Flag it and tell the user to check order depth in game. |
+| Outlier price | Current ask or buy order more than 30% away from the 7-day average: use the lower number. Watch. |
+| Cheap input | An input ask more than 30% below its own 7-day average may be one small order. Cost it at the average and flag it. |
 | Test batch | About 5% of one day's observed sales in the sell city, at least 1 craft, capped by the user's budget. |
 | Verdict | **pilot**: all checks pass. **watch**: profitable but a check fails. **avoid**: loss, missing data or no observed sales. |
 

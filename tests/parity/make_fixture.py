@@ -4,7 +4,8 @@ Run from the repo root after `export-index`:
     python tests/parity/make_fixture.py
 
 Writes tests/parity/fixture.json.gz: raw price and history rows for a fixed
-set of items plus a random sample, their inputs, and the capture time.
+set of items plus a random sample, their inputs, the reference items that date
+each city's history, and the capture time.
 """
 
 import gzip
@@ -40,15 +41,8 @@ def main():
     host = scout.HOSTS["europe"]
     now = scout.now_utc()
     start = scout.history_start(now, 14)
-    locations = scout.SELL_MARKETS
-    price_rows, history_rows = [], []
-    query = "?locations=%s&qualities=1" % scout.loc_param(locations)
-    for chunk in scout.chunked(sorted(ids), len(host) + 40 + len(query)):
-        price_rows += scout.get_json("%s/api/v2/stats/prices/%s.json%s" % (host, ",".join(chunk), query))
-    query = "?date=%s&end_date=%s&locations=%s&qualities=1&time-scale=24" % (
-        start.isoformat(), now.date().isoformat(), scout.loc_param(locations))
-    for chunk in scout.chunked(sorted(ids), len(host) + 40 + len(query)):
-        history_rows += scout.get_json("%s/api/v2/stats/history/%s.json%s" % (host, ",".join(chunk), query))
+    price_rows = scout.fetch_price_rows(host, ids, scout.SELL_MARKETS)
+    history_rows = scout.fetch_history_rows(host, ids, scout.SELL_MARKETS, start, now.date())
     fixture = {"now": now.isoformat(), "start": start.isoformat(), "items": items,
                "price_rows": price_rows, "history_rows": history_rows}
     out = Path(__file__).with_name("fixture.json.gz")

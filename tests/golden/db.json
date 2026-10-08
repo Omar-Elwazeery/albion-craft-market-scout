@@ -1,0 +1,23 @@
+{
+ "built": "golden test recipes",
+ "items": {
+  "T4_BAG": {"type": "equipmentitem", "tier": 4, "shop": "bags", "sub": "bags", "cat": "bag", "maxq": 5, "ench": 0,
+   "recipes": [{"silver": 0, "amount": 1, "inputs": [["T4_CLOTH", 8, true], ["T4_LEATHER", 8, true]], "extra": []}]},
+  "T4_BAG@1": {"type": "equipmentitem", "tier": 4, "shop": "bags", "sub": "bags", "cat": "bag", "maxq": 5, "ench": 1,
+   "recipes": [{"silver": 0, "amount": 1, "inputs": [["T4_CLOTH_LEVEL1@1", 8, true], ["T4_LEATHER_LEVEL1@1", 8, true]], "extra": []}]},
+  "T4_POTION_TEST": {"type": "consumableitem", "tier": 4, "shop": "consumables", "sub": "potions", "cat": "potion", "maxq": 1, "ench": 0,
+   "recipes": [{"silver": 0, "amount": 5, "inputs": [["T4_HERB", 24, true], ["T3_EGG", 6, true]], "extra": []}]},
+  "T4_SWORD_ART": {"type": "weapon", "tier": 4, "shop": "weapons", "sub": "sword", "cat": "sword", "maxq": 5, "ench": 0,
+   "recipes": [{"silver": 0, "amount": 1, "inputs": [["T4_METALBAR", 16, true], ["T4_ARTEFACT_SWORD", 1, false]], "extra": []}]},
+  "T4_CAPE_FACTION": {"type": "equipmentitem", "tier": 4, "shop": "capes", "sub": "capes", "cat": null, "maxq": 5, "ench": 0,
+   "recipes": [{"silver": 0, "amount": 1, "inputs": [["T4_CAPE", 1, false], ["T4_TOKEN", 1, false]], "extra": []}]},
+  "T5_PLANKS": {"type": "simpleitem", "tier": 5, "shop": "crafting", "sub": "refinedresources", "cat": "wood", "maxq": 1, "ench": 0,
+   "recipes": [{"silver": 0, "amount": 1, "inputs": [["T5_WOOD", 3, true], ["T4_PLANKS", 1, true]], "extra": []}]},
+  "T4_MOUNT_X": {"type": "mount", "tier": 4, "shop": "mounts", "sub": "mounts", "cat": null, "maxq": 1, "ench": 0,
+   "recipes": [{"silver": 0, "amount": 1, "inputs": [["T4_HIDE", 10, true]], "extra": ["3000 FACTION_STEPPE"]}]}
+ },
+ "values": {"T4_CLOTH": 16, "T4_LEATHER": 16, "T4_METALBAR": 16, "T4_CLOTH_LEVEL1@1": 32, "T4_LEATHER_LEVEL1@1": 32,
+            "T4_POTION_TEST": 40, "T5_PLANKS": 32},
+ "names": {"T4_BAG": "Adept's Bag", "T4_BAG@1": "Adept's Bag", "T4_CLOTH": "Fine Cloth", "T4_LEATHER": "Worked Leather",
+           "T4_POTION_TEST": "Test Potion", "T4_SWORD_ART": "Test Sword", "T4_CAPE_FACTION": "Test Cape", "T5_PLANKS": "Cedar Planks"}
+}

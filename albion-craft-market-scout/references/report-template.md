@@ -21,10 +21,10 @@ Under the table, say which rows are **high margin, low volume** and which are **
 - **Craft in:** city and return rate. **Sell in:** city, sell order or instant sell. Route risk.
 - **Sale price used:** amount, and whether it is the lowest ask, the highest buy order, or the 7-day average sale price. City, quality 1, quote time (UTC), source URL. Never the highest ask.
 
-| Input | Qty per craft | Unit price | Bought in | Quote time / age | Cost | Returned? |
-|---|---:|---:|---|---|---:|---|
+| Input | Qty per craft | Unit price | Bought in | Quote time / age | Cost | Returned? | Pay at most |
+|---|---:|---:|---|---|---:|---|---:|
 
-List artifacts, tokens, hearts, crests and Avalonian Energy as their own rows, marked "no". Journals go in a separate line, not in the cost, unless the user wants them counted.
+List artifacts, tokens, hearts, crests and Avalonian Energy as their own rows, marked "no". Journals go in a separate line, not in the cost, unless the user wants them counted. When an input's ask was far below its 7-day average, show both prices and say the cost used the average.
 
 | Per craft | Silver |
 |---|---:|
@@ -37,9 +37,11 @@ List artifacts, tokens, hearts, crests and Avalonian Energy as their own rows, m
 | Net sale proceeds (output count x price x (1 - tax - setup fee)) | |
 | **Profit per craft / per item / margin** | |
 | Break-even cap for unknown costs | |
+| Lowest sale price for a 10% margin / to break even | |
 
-- **Sales evidence:** units sold in the last 7 and 14 days in the sell city, days with data, the window's end date, and any gaps or lag.
+- **Sales evidence:** units sold in the last 7 and 14 days in the sell city, days with data, the window's end date, the last day with sales data, and any gaps or lag.
 - **Test batch:** number of crafts and silver needed.
+- **Check in game before buying:** the list from `evaluate`. For each input, the city, the units the test batch needs, and the most to pay. For the output, the lowest price it can sell at. The station fee. AODP shows no order sizes, so these are the player's last check.
 - **Open risks:** stale quotes, thin inputs, red-zone route, unverified fees.
 
 ## 4. Next step

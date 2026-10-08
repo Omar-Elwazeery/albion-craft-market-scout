@@ -88,8 +88,9 @@
           </label>
         </details>
 
-        <button type="submit" class="primary" id="scan-btn">Scan the market</button>
-        <p class="hint">A full scan sends about 50 requests to the Albion Online Data Project and takes 15 to 30 seconds.</p>
+        <p class="hint">Results update as you change these, from a market snapshot taken about every 30 minutes.</p>
+        <button type="submit" class="secondary" id="scan-btn">Rescan from live prices</button>
+        <p class="hint">Fetches prices directly instead: about 60 requests to the Albion Online Data Project, 15 to 60 seconds.</p>
       </form>
     </aside>
 
@@ -121,6 +122,7 @@
         <span class="pill watch">watch</span> profitable, but a check failed.
         <span class="chip risk">red zone</span> route crosses full-loot PvP zones.
       </p>
+      <p class="track" id="track-record" hidden></p>
     </section>
   </main>
 
@@ -148,6 +150,11 @@
       <a href="https://github.com/Omar-Elwazeery/albion-craft-market-scout" rel="noopener">source on GitHub</a>.
       Not affiliated with Albion Online or Sandbox Interactive.
       <span id="data-built"></span>
+    </p>
+    <p>
+      You can make every scan more accurate: run the <a href="https://github.com/ao-data/albiondata-client" rel="noopener">Albion Data Client</a>
+      or the <a href="https://albionfreemarket.com/data-client" rel="noopener">AFM Data Client</a> (one of them, not both) while you
+      visit markets, and your game uploads the prices you see.
     </p>
   </footer>
 </body>

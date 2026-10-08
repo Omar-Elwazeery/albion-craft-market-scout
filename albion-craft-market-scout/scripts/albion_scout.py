@@ -13,6 +13,10 @@ Commands (each has --help)
   history ITEMS     daily units traded and average price per city
   evaluate ITEM     full per-craft economics for one item
   scan              rank many craftable items to find leads
+  export-index      write the recipe index the web app loads
+  snapshot          write the market snapshot the web app shows on load
+  check-game-data   compare the constants below with the latest game data
+  backtest          score past pilot verdicts against the sales that followed
 
 ITEM is an Albion ID: T4_BAG, T6_MAIN_SWORD@2 (enchantment 2), T5_PLANKS_LEVEL1@1.
 Add --json for machine-readable output. All money is silver.
@@ -46,15 +50,17 @@ HOSTS = {
 }
 DUMP_ITEMS = "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/master/items.json"
 DUMP_NAMES = "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/master/formatted/items.json"
+DUMP_MODIFIERS = "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/master/craftingmodifiers.json"
+DUMP_GAMEDATA = "https://raw.githubusercontent.com/ao-data/ao-bin-dumps/master/gamedata.json"
 INDEX_MAX_AGE_DAYS = 7
 
 ROYAL = ["Bridgewatch", "Fort Sterling", "Lymhurst", "Martlock", "Thetford"]
 BUY_MARKETS = ROYAL + ["Brecilien", "Caerleon"]          # you can buy here
 SELL_MARKETS = BUY_MARKETS + ["Black Market"]            # Black Market: sell only
 CRAFT_CITIES = ROYAL + ["Brecilien", "Caerleon"]         # 18% base production bonus
-ROUTE_RISK = {
-    "Caerleon": "red-zone route (full-loot PvP)",
-    "Black Market": "Caerleon, red-zone route (full-loot PvP)",
+ROUTE_RISK = {                                           # reached only through red zones (full-loot PvP)
+    "Caerleon": "Caerleon",
+    "Black Market": "the Black Market (in Caerleon)",
 }
 ROUTE_NOTE = {
     "Brecilien": "Brecilien: Travel Planner fee, or the Mists (portal needs 50,000 standing)",
@@ -86,13 +92,30 @@ SPECIALIZATION = {cat: city for city, cats in CRAFT_SPECIALIZATION.items() for c
 
 # Decision thresholds (see SKILL.md "Decision rules").
 FRESH_HOURS = 6        # quotes older than this are flagged "aging"
+KEY_QUOTE_HOURS = 12   # sale price or biggest input quote older than this: watch
 MAX_AGE_HOURS = 24     # AODP drops orders not seen for 24 h anyway
 MIN_MARGIN = 0.10      # profit / total cost needed for a pilot
 MIN_DAILY_UNITS = 5    # average units sold per day in the sell city (7-day window)
 MIN_COVERAGE_DAYS = 4  # days with history data out of the last 7
+QUIET_DAYS = 3         # no sales data this many days before the city's latest data: watch
+CITY_LAG_NOTE = 3      # a city's history this many days behind other cities is noted
+CITY_LAG_HARD = 5      # ... and this many days behind means watch
 OUTLIER_BAND = 0.30    # ask more than 30% away from 7-day average is flagged
 CAPTURE_SHARE = 0.10   # assume you can sell ~10% of observed daily volume
 PILOT_SHARE = 0.05     # test batch: ~5% of one day's observed sales
+PREFILTER_MARGIN = 0.05  # scan: margin on current quotes needed before the history check
+HISTORY_FOR = 400        # scan: how many of those get a history check
+GAME_DATA_CHECKED = "2026-10-08"  # last day check-game-data passed against these constants
+
+# History only reaches AODP when a player opens an item's price chart, so one
+# item's series can stop while its city's data goes on. These often-viewed items
+# ride along with every history request, so each city's latest data day is known.
+REFERENCE_ITEMS = [
+    "T4_BAG", "T5_BAG", "T6_BAG", "T4_CAPE", "T5_CAPE", "T4_MAIN_DAGGER", "T4_2H_BOW",
+    "T4_ARMOR_CLOTH_SET1", "T4_ARMOR_CLOTH_SET2", "T4_ARMOR_CLOTH_SET3", "T5_ARMOR_CLOTH_SET1",
+    "T4_ARMOR_LEATHER_SET1", "T4_ARMOR_LEATHER_SET2", "T4_HEAD_LEATHER_SET3", "T4_HEAD_PLATE_SET1",
+    "T4_SHOES_CLOTH_SET1", "T4_SHOES_PLATE_SET1", "T4_PLANKS", "T4_METALBAR", "T4_LEATHER", "T4_CLOTH",
+]
 
 SCAN_GROUPS = {
     "bags": lambda m: m["shop"] == "bags",
@@ -427,14 +450,27 @@ def loc_param(locations):
     return ",".join(urllib.parse.quote(l) for l in locations)
 
 
-def fetch_quotes(host, ids, locations):
-    """{(item, city): {ask, ask_age_h, bid, bid_age_h}} for quality 1."""
+# Every AODP URL fetched in this run, with the time, so answers can cite them.
+FETCH_LOG = []
+
+
+def fetch_rows(host, kind, ids, query):
     rows = []
-    query = "?locations=%s&qualities=1" % loc_param(locations)
     for chunk in chunked(sorted(set(ids)), len(host) + 40 + len(query)):
         path = ",".join(urllib.parse.quote(i, safe="@_") for i in chunk)
-        rows.extend(get_json("%s/api/v2/stats/prices/%s.json%s" % (host, path, query)))
-    return parse_prices(rows, now_utc())
+        url = "%s/api/v2/stats/%s/%s.json%s" % (host, kind, path, query)
+        rows.extend(get_json(url))
+        FETCH_LOG.append({"url": url, "retrieved": now_utc().strftime("%Y-%m-%dT%H:%M:%SZ")})
+    return rows
+
+
+def fetch_price_rows(host, ids, locations):
+    return fetch_rows(host, "prices", ids, "?locations=%s&qualities=1" % loc_param(locations))
+
+
+def fetch_quotes(host, ids, locations):
+    """{(item, city): {ask, ask_age_h, bid, bid_age_h}} for quality 1."""
+    return parse_prices(fetch_price_rows(host, ids, locations), now_utc())
 
 
 def parse_prices(rows, now):
@@ -459,22 +495,25 @@ def history_start(now, days):
     return now.date() - timedelta(days=days)
 
 
+def history_query(start, end, locations):
+    return "?date=%s&end_date=%s&locations=%s&qualities=1&time-scale=24" % (
+        start.isoformat(), end.isoformat(), loc_param(locations))
+
+
+def fetch_history_rows(host, ids, locations, start, end):
+    """Raw daily history rows. REFERENCE_ITEMS ride along to date each city's data."""
+    return fetch_rows(host, "history", set(ids) | set(REFERENCE_ITEMS), history_query(start, end, locations))
+
+
 def fetch_history(host, ids, locations, days=14):
     """{(item, city): summary} from daily buckets; first partial bucket dropped."""
     now = now_utc()
     start = history_start(now, days)
-    query = "?date=%s&end_date=%s&locations=%s&qualities=1&time-scale=24" % (
-        start.isoformat(), now.date().isoformat(), loc_param(locations))
-    rows = []
-    for chunk in chunked(sorted(set(ids)), len(host) + 40 + len(query)):
-        path = ",".join(urllib.parse.quote(i, safe="@_") for i in chunk)
-        rows.extend(get_json("%s/api/v2/stats/history/%s.json%s" % (host, path, query)))
-    return summarize_history(rows, start)
+    return summarize_history(fetch_history_rows(host, ids, locations, start, now.date()), start)
 
 
 def summarize_history(rows, start):
     series = {}
-    latest = None
     for row in rows:
         city = CITY_BY_NORM.get(norm_city(row.get("location")))
         if not city:
@@ -488,14 +527,21 @@ def summarize_history(rows, start):
             cnt, avg = d.get("item_count") or 0, d.get("avg_price") or 0
             prev = days_map.get(day, (0, 0))
             days_map[day] = (prev[0] + cnt, prev[1] + cnt * avg)
-            latest = day if latest is None or day > latest else latest
-    # Each city's scans lag by a different number of days, so every series gets
-    # its own 7/14-day window ending at its latest bucket, plus a lag figure.
+    # History arrives when a player opens an item's price chart, so each city's
+    # data runs to a different day. Every item's window ends on its city's latest
+    # day, and days without data inside it count as zero sales.
+    city_end = {}
+    for (_, city), days_map in series.items():
+        if days_map:
+            city_end[city] = max(city_end.get(city, max(days_map)), max(days_map))
+    latest = max(city_end.values()) if city_end else None
     summaries = {}
     for key, days_map in series.items():
         if not days_map:
             continue
-        end_day = max(days_map)
+        end_day = city_end[key[1]]
+        sold = [d for d, v in days_map.items() if v[0] > 0]
+        last_sale = max(sold) if sold else None
 
         def agg(n):
             window = {end_day - timedelta(days=i) for i in range(n)}
@@ -509,6 +555,8 @@ def summarize_history(rows, start):
             "units7": u7, "per_day7": u7 / 7.0, "vwap7": vwap7, "days7": cov7,
             "units14": u14, "per_day14": u14 / 14.0, "vwap14": vwap14, "days14": cov14,
             "window_end": end_day.isoformat(), "lag_days": (latest - end_day).days,
+            "last_sale": last_sale.isoformat() if last_sale else None,
+            "quiet_days": (end_day - last_sale).days if last_sale else None,
         }
     return summaries
 
@@ -600,6 +648,46 @@ def sell_options(iid, quotes, hist, sell_cities, tax, max_age):
     return options
 
 
+def demand_ok(h):
+    """Sales history strong enough for a pilot: volume, coverage, and recent data."""
+    return bool(h) and h["per_day7"] >= MIN_DAILY_UNITS and h["days7"] >= MIN_COVERAGE_DAYS \
+        and h["quiet_days"] is not None and h["quiet_days"] < QUIET_DAYS
+
+
+def pick_sale(opts_list, hist, min_net):
+    """Best net price, preferring cities that pass the demand checks and still clear
+    MIN_MARGIN (net per item of at least min_net), so a slightly cheaper city with
+    real sales beats a pricier one without them.
+
+    Once history is loaded, only cities with observed sales can be the pick:
+    an ask nobody has paid for is not revenue.
+    """
+    pool = opts_list
+    if hist is not None:
+        seen = [o for o in opts_list if o["hist"] and o["hist"]["units7"] > 0]
+        good = [o for o in seen if demand_ok(o["hist"]) and min_net is not None and o["net"] >= min_net]
+        pool = good or seen or opts_list
+    return max(pool, key=lambda o: o["net"]) if pool else None
+
+
+def add_limits(res):
+    """Prices the player can check in game: the most each input may cost, and the
+    least the output may sell for, with every other number fixed, for MIN_MARGIN."""
+    for l in res["lines"]:
+        l["buy_limit"] = None
+    res["sell_limit"], res["breakeven_price"] = None, None
+    if res["profit"] is None:
+        return
+    cost, sale = res["cost"], res["sale"]
+    cost_max = res["revenue"] / (1 + MIN_MARGIN)
+    for l in res["lines"]:
+        kept = 1 - (res["rrr"] or 0.0) if l["returnable"] else 1.0
+        l["buy_limit"] = l["cost_unit"] + (cost_max - cost) / (l["count"] * kept)
+    keep = 1 - res["tax"] - (SETUP_FEE if sale["mode"] == "sell order" else 0.0)
+    res["sell_limit"] = cost * (1 + MIN_MARGIN) / (res["amount"] * keep)
+    res["breakeven_price"] = cost / (res["amount"] * keep)
+
+
 def evaluate(db, iid, quotes, hist, opts, _nested=False):
     item = require_item(db, iid)
     craft_city, city_note = pick_craft_city(item, opts)
@@ -615,11 +703,14 @@ def evaluate(db, iid, quotes, hist, opts, _nested=False):
                 missing.append(inp)
             ih = (hist or {}).get((inp, q["city"])) if q else None
             cheap = ih["vwap7"] if ih and ih["vwap7"] and q["price"] < (1 - OUTLIER_BAND) * ih["vwap7"] else None
+            # An ask far below what the input really trades at may be one small
+            # order, so the cost uses the 7-day average instead.
+            cost_unit = (cheap or q["price"]) if q else None
             lines.append({
                 "id": inp, "name": name_of(db, inp), "count": cnt, "returnable": returnable,
-                "unit": q["price"] if q else None, "city": q["city"] if q else None,
+                "unit": q["price"] if q else None, "cost_unit": cost_unit, "city": q["city"] if q else None,
                 "age_h": q["age_h"] if q else None,
-                "ext": q["price"] * cnt if q else None, "cheap_vs_avg": cheap,
+                "ext": cost_unit * cnt if q else None, "cheap_vs_avg": cheap,
             })
         raw = sum(l["ext"] for l in lines if l["ext"] is not None)
         returnable_raw = sum(l["ext"] for l in lines if l["ext"] is not None and l["returnable"])
@@ -648,13 +739,8 @@ def evaluate(db, iid, quotes, hist, opts, _nested=False):
     opts_list = sell_options(iid, quotes, hist, opts.sells, tax, opts.max_age)
     if opts.sell_city:
         opts_list = [o for o in opts_list if o["city"] == canonical_city(opts.sell_city)]
-    # Once history is loaded, only cities with observed sales can be the pick;
-    # an ask nobody has paid for is not revenue.
-    if hist is not None:
-        pool = [o for o in opts_list if o["hist"] and o["hist"]["units7"] > 0] or opts_list
-    else:
-        pool = opts_list
-    sale = max(pool, key=lambda o: o["net"]) if pool else None
+    sale = pick_sale(opts_list, hist,
+                     None if best["missing"] else best["cost"] * (1 + MIN_MARGIN) / best["amount"])
     if craft_city is None:
         spend = {}
         for l in best["lines"]:
@@ -677,6 +763,7 @@ def evaluate(db, iid, quotes, hist, opts, _nested=False):
         res["breakeven_cap"] = revenue - (best["cost"] - (best["transport"] or 0.0))
     else:
         res.update(revenue=None, profit=None, profit_unit=None, margin=None, breakeven_cap=None)
+    add_limits(res)
     res["verdict"], res["reasons"] = verdict(res)
     h = sale["hist"] if sale else None
     res["daily_capacity"], res["pilot_crafts"], res["pilot_capital"] = None, None, None
@@ -712,6 +799,7 @@ def route_cities(r):
 
 
 def verdict(r):
+    """(verdict, reasons). Any failed check is a reason; only hard ones block a pilot."""
     reasons = []
     if r["missing"]:
         reasons.append("no fresh price for: " + ", ".join(r["missing"]))
@@ -728,40 +816,83 @@ def verdict(r):
     sale, h = r["sale"], r["sale"]["hist"]
     if h is None or h["units7"] == 0:
         return "avoid", ["no observed sales in %s in the last 7 days; demand unverified" % sale["city"]]
+    hard = []
+
+    def add(text, blocks=True):
+        reasons.append(text)
+        if blocks:
+            hard.append(text)
     if r["margin"] is not None and r["margin"] < MIN_MARGIN:
-        reasons.append("margin %s below %s" % (pct(r["margin"]), pct(MIN_MARGIN)))
+        add("margin %s below %s" % (pct(r["margin"]), pct(MIN_MARGIN)))
     if h["per_day7"] < MIN_DAILY_UNITS:
-        reasons.append("thin volume: %.1f/day in %s" % (h["per_day7"], sale["city"]))
+        add("thin volume: %.1f/day in %s" % (h["per_day7"], sale["city"]))
     if h["days7"] < MIN_COVERAGE_DAYS:
-        reasons.append("history covers %d of 7 days" % h["days7"])
-    if h.get("lag_days", 0) >= 5:
-        reasons.append("sales history for %s is stale: ends %s, %d days behind other cities" % (
+        add("history covers %d of 7 days" % h["days7"])
+    if h["quiet_days"] is not None and h["quiet_days"] >= QUIET_DAYS:
+        add("no sales data in %s since %s, %d days before that city's latest data" % (
+            sale["city"], h["last_sale"], h["quiet_days"]))
+    if h["lag_days"] >= CITY_LAG_HARD:
+        add("sales history for %s is stale: ends %s, %d days behind other cities" % (
             sale["city"], h["window_end"], h["lag_days"]))
-    elif h.get("lag_days", 0) >= 3:
-        reasons.append("history for %s ends %s, %d days behind other cities" % (
-            sale["city"], h["window_end"], h["lag_days"]))
+    elif h["lag_days"] >= CITY_LAG_NOTE:
+        add("history for %s ends %s, %d days behind other cities" % (
+            sale["city"], h["window_end"], h["lag_days"]), blocks=False)
     if sale["outlier"]:
         quoted = sale["bid"] if sale["mode"].startswith("instant") else sale["ask"]
-        reasons.append("current price %s is >%d%% from 7-day avg %s; used the lower" % (
+        add("current price %s is >%d%% from 7-day avg %s; used the lower" % (
             fmt(quoted), OUTLIER_BAND * 100, fmt(sale["vwap7"])))
     for l in r["lines"]:
-        if l.get("cheap_vs_avg"):
-            reasons.append("input %s ask %s is far below its 7-day avg %s in %s; may be a small order" % (
-                l["id"], fmt(l["unit"]), fmt(l["cheap_vs_avg"]), l["city"]))
-    ages = [l["age_h"] for l in r["lines"] if l["age_h"] is not None] + [sale["age_h"]]
-    if max(ages) > FRESH_HOURS:
-        reasons.append("oldest quote %s (aging)" % age_text(max(ages)))
+        if l["cheap_vs_avg"]:
+            add("input %s ask %s is far below its 7-day avg %s in %s; costed at the average" % (
+                l["id"], fmt(l["unit"]), fmt(l["cheap_vs_avg"]), l["city"]), blocks=False)
+    main = max(r["lines"], key=lambda l: l["ext"])
+    stale_key = False
+    if sale["age_h"] > KEY_QUOTE_HOURS:
+        add("sale price quote is %s old (limit %dh)" % (age_text(sale["age_h"]), KEY_QUOTE_HOURS))
+        stale_key = True
+    if main["age_h"] > KEY_QUOTE_HOURS:
+        add("main input %s quote is %s old (limit %dh)" % (main["id"], age_text(main["age_h"]), KEY_QUOTE_HOURS))
+        stale_key = True
+    ages = [l["age_h"] for l in r["lines"]] + [sale["age_h"]]
+    if not stale_key and max(ages) > FRESH_HOURS:
+        add("oldest quote %s (aging)" % age_text(max(ages)), blocks=False)
     risks = sorted({ROUTE_RISK[c] for c in route_cities(r) if c in ROUTE_RISK})
     if risks:
-        reasons.append("route risk: " + ", ".join(risks))
-    soft = ("oldest quote", "route risk", "history for", "input ")
-    hard = [x for x in reasons if not x.startswith(soft)]
+        add("route risk: red zones (full-loot PvP) to reach " + " and ".join(risks), blocks=False)
     return ("watch" if hard else "pilot"), reasons
 
 
 # --------------------------------------------------------------------------
 # Output
 # --------------------------------------------------------------------------
+
+def limit_text(x):
+    if x is None:
+        return "n/a"
+    return fmt(x) if x > 0 else "none"
+
+
+def checklist(r):
+    """What to confirm on the in-game market before buying, since AODP shows no order sizes."""
+    if r["profit"] is None or r["verdict"] == "avoid":
+        return []
+    crafts = r["pilot_crafts"] or 1
+    s = r["sale"]
+    items = []
+    for l in r["lines"]:
+        items.append("In %s, you can buy %d %s at %s or less each." % (
+            l["city"], l["count"] * crafts, l["name"], limit_text(l["buy_limit"])))
+    units = r["amount"] * crafts
+    if s["mode"] == "sell order":
+        items.append("In %s, the cheapest %s listing is still %s or more (you will list %d)." % (
+            s["city"], r["name"], limit_text(r["sell_limit"]), units))
+    else:
+        items.append("In %s, buy orders at %s or more cover %d units." % (s["city"], limit_text(r["sell_limit"]), units))
+    if r["station_fee"] is not None:
+        items.append("In %s, the crafting window's station fee is at most %s per craft." % (
+            r["craft_city"], fmt(r["station_fee"])))
+    return items
+
 
 def print_evaluation(r):
     a = r["amount"]
@@ -782,19 +913,22 @@ def print_evaluation(r):
         h = s["hist"]
         if h:
             out("- Sales evidence (%s, quality 1): %s units in 7 days (%.1f/day, %d/7 days with data), "
-                "7-day avg %s; 14 days: %s units, avg %s; window ends %s" % (
+                "7-day avg %s; 14 days: %s units, avg %s; window ends %s, last sale data %s" % (
                     s["city"], fmt(h["units7"]), h["per_day7"], h["days7"], fmt(h["vwap7"]),
-                    fmt(h["units14"]), fmt(h["vwap14"]), h["window_end"]))
+                    fmt(h["units14"]), fmt(h["vwap14"]), h["window_end"], h["last_sale"] or "none"))
         else:
             out("- Sales evidence: none in AODP history for %s. Sparse data is not proof of no demand." % s["city"])
     out("- Output per craft: %d" % a)
     out("")
-    out("| Input | Qty/craft | Unit price | Bought in | Quote age | Cost | Returns? |")
-    out("|---|---:|---:|---|---:|---:|---|")
+    out("| Input | Qty/craft | Unit price | Bought in | Quote age | Cost | Returns? | Pay at most |")
+    out("|---|---:|---:|---|---:|---:|---|---:|")
     for l in r["lines"]:
-        out("| %s `%s` | %d | %s | %s | %s | %s | %s |" % (
-            l["name"], l["id"], l["count"], fmt(l["unit"]), l["city"] or "MISSING",
-            age_text(l["age_h"]), fmt(l["ext"]), "yes" if l["returnable"] else "no"))
+        unit = fmt(l["unit"])
+        if l["cheap_vs_avg"]:
+            unit += " (costed at avg %s)" % fmt(l["cost_unit"])
+        out("| %s `%s` | %d | %s | %s | %s | %s | %s | %s |" % (
+            l["name"], l["id"], l["count"], unit, l["city"] or "MISSING",
+            age_text(l["age_h"]), fmt(l["ext"]), "yes" if l["returnable"] else "no", limit_text(l["buy_limit"])))
     out("")
     out("| Per craft | Silver |")
     out("|---|---:|")
@@ -812,10 +946,18 @@ def print_evaluation(r):
     out("| Profit per item / margin | %s / %s |" % (fmt(r["profit_unit"]), pct(r["margin"])))
     if r["transport"] is None and r["breakeven_cap"] is not None:
         out("| Max transport + other unknown costs before a loss | %s per craft |" % fmt(r["breakeven_cap"]))
+    if r["sell_limit"] is not None:
+        out("| Lowest sale price for a %s margin / to break even | %s / %s each |" % (
+            pct(MIN_MARGIN), limit_text(r["sell_limit"]), limit_text(r["breakeven_price"])))
     out("")
     if r["pilot_crafts"]:
         out("- Test batch: %d craft(s), about %s silver up front (about 5%% of one day's observed sales%s)" % (
             r["pilot_crafts"], fmt(r["pilot_capital"]), ", capped by --budget" if r.get("budget") else ""))
+    checks = checklist(r)
+    if checks:
+        out("- Check in game before buying (each price limit assumes the other prices stay as shown):")
+        for c in checks:
+            out("  - " + c)
     sa = r.get("safe_alt")
     if sa:
         if sa["profit"] is None:
@@ -911,12 +1053,12 @@ def cmd_history(args):
     if args.json:
         out(json.dumps([{"item": k[0], "city": k[1], **v} for k, v in sorted(hist.items())], indent=1))
         return
-    out("| Item | City | Units 7d | Per day | Days w/ data | Avg price 7d | Units 14d | Avg price 14d | Window end |")
-    out("|---|---|---:|---:|---:|---:|---:|---:|---|")
+    out("| Item | City | Units 7d | Per day | Days w/ data | Avg price 7d | Units 14d | Avg price 14d | Window end | Last sale |")
+    out("|---|---|---:|---:|---:|---:|---:|---:|---|---|")
     for (iid, city), h in sorted(hist.items()):
-        out("| %s | %s | %s | %.1f | %d/7 | %s | %s | %s | %s |" % (
+        out("| %s | %s | %s | %.1f | %d/7 | %s | %s | %s | %s | %s |" % (
             iid, city, fmt(h["units7"]), h["per_day7"], h["days7"], fmt(h["vwap7"]),
-            fmt(h["units14"]), fmt(h["vwap14"]), h["window_end"]))
+            fmt(h["units14"]), fmt(h["vwap14"]), h["window_end"], h["last_sale"] or "-"))
 
 
 def cmd_evaluate(args):
@@ -929,42 +1071,67 @@ def cmd_evaluate(args):
     hist = fetch_history(host, ids, sorted(set(args.sells) | set(args.sources)), 14)
     r = evaluate(db, args.item, quotes, hist, args)
     if args.json:
-        out(json.dumps(r, indent=1, default=str))
+        out(json.dumps(dict(r, sources=FETCH_LOG), indent=1, default=str))
         return
     print_assumptions(args)
     print_evaluation(r)
+    out("Sources (AODP, retrieved UTC):")
+    for f in FETCH_LOG:
+        out("- %s %s" % (f["retrieved"], f["url"]))
+
+
+def scan_ids(db, groups, tiers, enchants):
+    ids = []
+    for iid, it in db["items"].items():
+        if it["tier"] in tiers and it["ench"] in enchants and any(SCAN_GROUPS[g](it) for g in groups):
+            if not iid.startswith(("UNIQUE_", "QUESTITEM_")):
+                ids.append(iid)
+    return ids
+
+
+def inputs_of(db, ids):
+    return {inp for i in ids for alt in db["items"][i]["recipes"] for inp, _, _ in alt["inputs"]}
+
+
+def scan_stage1(db, ids, quotes, opts, prefilter_margin):
+    """Items that clear the pre-filter on current quotes alone, best margin first."""
+    stage1 = []
+    for iid in ids:
+        r = evaluate(db, iid, quotes, None, opts)
+        if r["profit"] is not None and r["margin"] is not None and r["margin"] >= prefilter_margin:
+            stage1.append(r)
+    stage1.sort(key=lambda r: -r["margin"])
+    return stage1
+
+
+def scan_final(db, shortlist, quotes, hist, opts):
+    """Shortlist re-checked with sales history: still profitable, pilots first."""
+    final = [evaluate(db, iid, quotes, hist, opts) for iid in shortlist]
+    final = [r for r in final if r["profit"] is not None and r["profit"] > 0]
+    order = {"pilot": 0, "watch": 1, "avoid": 2}
+    final.sort(key=lambda r: (order[r["verdict"]], -(r["daily_capacity"] or 0)))
+    return final
 
 
 def cmd_scan(args):
     db = load_db(args)
     host = HOSTS[args.server]
     groups = args.groups or DEFAULT_SCAN_GROUPS
-    tiers = set(range(args.min_tier, args.max_tier + 1))
-    enchants = set(range(args.min_enchant, args.max_enchant + 1))
-    ids = []
-    for iid, it in db["items"].items():
-        if it["tier"] in tiers and it["ench"] in enchants and any(SCAN_GROUPS[g](it) for g in groups):
-            if not iid.startswith(("UNIQUE_", "QUESTITEM_")):
-                ids.append(iid)
+    ids = scan_ids(db, groups, set(range(args.min_tier, args.max_tier + 1)),
+                   set(range(args.min_enchant, args.max_enchant + 1)))
     if not ids:
         raise SystemExit("No craftable items match these filters.")
-    inputs = {inp for i in ids for alt in db["items"][i]["recipes"] for inp, _, _ in alt["inputs"]}
+    inputs = inputs_of(db, ids)
     sys.stderr.write("Scanning %d items (%d inputs) across %d markets...\n" % (len(ids), len(inputs), len(SELL_MARKETS)))
     quotes = fetch_quotes(host, set(ids) | inputs, SELL_MARKETS)
-    stage1 = []
-    for iid in ids:
-        r = evaluate(db, iid, quotes, None, args)
-        if r["profit"] is not None and r["margin"] is not None and r["margin"] >= args.prefilter_margin:
-            stage1.append(r)
-    stage1.sort(key=lambda r: -r["margin"])
+    stage1 = scan_stage1(db, ids, quotes, args, args.prefilter_margin)
     shortlist = [r["item"] for r in stage1[:args.history_for]]
     sys.stderr.write("%d items look profitable on current quotes; checking history for %d...\n" % (
         len(stage1), len(shortlist)))
-    hist = fetch_history(host, shortlist, args.sells, 14) if shortlist else {}
-    final = [evaluate(db, iid, quotes, hist, args) for iid in shortlist]
-    final = [r for r in final if r["profit"] is not None and r["profit"] > 0]
-    order = {"pilot": 0, "watch": 1, "avoid": 2}
-    final.sort(key=lambda r: (order[r["verdict"]], -(r["daily_capacity"] or 0)))
+    # Inputs too, so a single cheap order is costed at what the input really trades at.
+    hist = fetch_history(host, set(shortlist) | inputs_of(db, shortlist),
+                         sorted(set(args.sells) | set(args.sources)), 14) if shortlist else {}
+    final = scan_final(db, shortlist, quotes, hist, args)
     if args.json:
         out(json.dumps({"generated": now_utc().isoformat(), "server": args.server, "groups": groups,
                         "tiers": [args.min_tier, args.max_tier],
@@ -984,9 +1151,24 @@ def cmd_scan(args):
     out("These are leads. Run `evaluate ITEM` on a row before crafting.")
 
 
+def write_json(path, data):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        json.dump(data, f, separators=(",", ":"), default=str)
+    os.replace(str(tmp), str(path))
+    return path.stat().st_size
+
+
 def cmd_export_index(args):
     """Write the compact recipe index and constants that the web app (web/core.js) loads."""
-    db = load_db(args)
+    data = export_data(load_db(args))
+    size = write_json(args.out, data)
+    sys.stderr.write("Wrote %d items to %s (%.1f MB)\n" % (len(data["items"]), args.out, size / 1e6))
+
+
+def export_data(db):
     items, names = {}, {}
     for iid, it in db["items"].items():
         groups = [g for g, match in SCAN_GROUPS.items() if match(it)]
@@ -1010,31 +1192,372 @@ def cmd_export_index(args):
         "nutrition_per_value": NUTRITION_PER_VALUE, "default_fee_per_100": DEFAULT_FEE_PER_100,
         "base_bonus": BASE_BONUS, "craft_spec_bonus": CRAFT_SPEC_BONUS,
         "refine_spec_bonus": REFINE_SPEC_BONUS, "fresh_hours": FRESH_HOURS,
-        "max_age_hours": MAX_AGE_HOURS, "min_margin": MIN_MARGIN, "min_daily_units": MIN_DAILY_UNITS,
-        "min_coverage_days": MIN_COVERAGE_DAYS, "outlier_band": OUTLIER_BAND,
-        "capture_share": CAPTURE_SHARE, "pilot_share": PILOT_SHARE,
+        "key_quote_hours": KEY_QUOTE_HOURS, "max_age_hours": MAX_AGE_HOURS, "min_margin": MIN_MARGIN,
+        "min_daily_units": MIN_DAILY_UNITS, "min_coverage_days": MIN_COVERAGE_DAYS,
+        "quiet_days": QUIET_DAYS, "city_lag_note": CITY_LAG_NOTE, "city_lag_hard": CITY_LAG_HARD,
+        "outlier_band": OUTLIER_BAND, "capture_share": CAPTURE_SHARE, "pilot_share": PILOT_SHARE,
+        "prefilter_margin": PREFILTER_MARGIN, "history_for": HISTORY_FOR,
+        "reference_items": REFERENCE_ITEMS, "game_data_checked": GAME_DATA_CHECKED,
         "scan_groups": list(SCAN_GROUPS), "default_groups": DEFAULT_SCAN_GROUPS,
     }
-    data = {"recipes_built": db["built"], "exported": now_utc().isoformat(),
+    return {"recipes_built": db["built"], "exported": now_utc().isoformat(),
             "econ": econ, "items": items, "names": names}
-    out_path = Path(args.out)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with out_path.open("w", encoding="utf-8") as f:
-        json.dump(data, f, separators=(",", ":"))
-    sys.stderr.write("Wrote %d items to %s (%.1f MB)\n" % (
-        len(items), out_path, out_path.stat().st_size / 1e6))
+
+
+def default_opts(**overrides):
+    """The settings evaluate and scan use when no flag changes them (the web app's defaults)."""
+    opts = argparse.Namespace(
+        tax=SALES_TAX, sources=list(BUY_MARKETS), sells=list(SELL_MARKETS), craft_city=None,
+        sell_city=None, rrr=None, daily_bonus=0.0, fee_per_100=DEFAULT_FEE_PER_100, station_fee=None,
+        transport=None, max_age=MAX_AGE_HOURS, budget=None)
+    for k, v in overrides.items():
+        setattr(opts, k, v)
+    return opts
+
+
+# --------------------------------------------------------------------------
+# Snapshot: the market data the web app shows on load
+# --------------------------------------------------------------------------
+
+def snapshot_wide_opts():
+    """The most favorable scan settings a web visitor can pick. Every visitor's
+    shortlist is inside the items that clear the pre-filter under these, so the
+    snapshot carries the history any of them needs."""
+    return default_opts(tax=PREMIUM_TAX, fee_per_100=0.0)
+
+
+def encode_snapshot(server, price_rows, history_rows, generated, start, recipes_built):
+    """Compact form of AODP rows: prices per item as [city, ask, ask age min, bid, bid age min],
+    history per item as [city, [[day after start, units, avg price], ...]]."""
+    base = generated.replace(second=0, microsecond=0)
+    ci = {c: i for i, c in enumerate(SELL_MARKETS)}
+
+    def minutes(t):
+        return int(round((base - t).total_seconds() / 60.0))
+    prices = {}
+    for row in price_rows:
+        city = CITY_BY_NORM.get(norm_city(row.get("city")))
+        if city is None:
+            continue
+        ask_t, bid_t = parse_ts(row.get("sell_price_min_date")), parse_ts(row.get("buy_price_max_date"))
+        ask = row.get("sell_price_min") or None if ask_t else None
+        bid = row.get("buy_price_max") or None if bid_t else None
+        if ask is None and bid is None:
+            continue
+        prices.setdefault(row["item_id"], []).append([
+            ci[city], ask, minutes(ask_t) if ask else None, bid, minutes(bid_t) if bid else None])
+    history = {}
+    for row in history_rows:
+        city = CITY_BY_NORM.get(norm_city(row.get("location")))
+        if city is None:
+            continue
+        days = []
+        for d in row.get("data") or []:
+            ts = parse_ts(d.get("timestamp"))
+            if ts is None or ts.date() < start:
+                continue
+            days.append([(ts.date() - start).days, d.get("item_count") or 0, d.get("avg_price") or 0])
+        if days:
+            history.setdefault(row["item_id"], []).append([ci[city], days])
+    return {"v": 1, "server": server, "generated": generated.isoformat(),
+            "base": base.strftime("%Y-%m-%dT%H:%M:%S"), "start": start.isoformat(),
+            "recipes_built": recipes_built, "cities": list(SELL_MARKETS),
+            "prices": prices, "history": history}
+
+
+def decode_snapshot(snap):
+    """(price rows, history rows, history start) in the AODP API's own shape."""
+    base = datetime.fromisoformat(snap["base"])
+    start = datetime.fromisoformat(snap["start"]).date()
+    missing = "0001-01-01T00:00:00"
+
+    def stamp(m):
+        return (base - timedelta(minutes=m)).strftime("%Y-%m-%dT%H:%M:%S")
+    price_rows = []
+    for iid, rows in snap["prices"].items():
+        for c, ask, ask_m, bid, bid_m in rows:
+            price_rows.append({
+                "item_id": iid, "city": snap["cities"][c], "quality": 1,
+                "sell_price_min": ask or 0, "sell_price_min_date": stamp(ask_m) if ask else missing,
+                "buy_price_max": bid or 0, "buy_price_max_date": stamp(bid_m) if bid else missing})
+    history_rows = []
+    for iid, series in snap["history"].items():
+        for c, days in series:
+            history_rows.append({
+                "item_id": iid, "location": snap["cities"][c], "quality": 1,
+                "data": [{"timestamp": (start + timedelta(days=d)).isoformat() + "T00:00:00",
+                          "item_count": n, "avg_price": p} for d, n, p in days]})
+    return price_rows, history_rows, start
+
+
+def pilot_log_entry(r):
+    s = r["sale"]
+    return {"item": r["item"], "name": r["name"], "craft_city": r["craft_city"], "sell_city": s["city"],
+            "mode": s["mode"], "price": s["price"], "breakeven_price": r["breakeven_price"],
+            "sell_limit": r["sell_limit"], "amount": r["amount"], "cost": r["cost"], "profit": r["profit"],
+            "margin": r["margin"], "per_day7": s["hist"]["per_day7"]}
+
+
+def cmd_snapshot(args):
+    db = load_db(args)
+    host = HOSTS[args.server]
+    ids = scan_ids(db, list(SCAN_GROUPS), set(range(4, 9)), set(range(0, 5)))
+    inputs = inputs_of(db, ids)
+    generated = now_utc()
+    sys.stderr.write("[%s] prices for %d items and %d inputs...\n" % (args.server, len(ids), len(inputs)))
+    price_rows = fetch_price_rows(host, set(ids) | inputs, SELL_MARKETS)
+    quotes = parse_prices(price_rows, generated)
+    wide = [r["item"] for r in scan_stage1(db, ids, quotes, snapshot_wide_opts(), PREFILTER_MARGIN)]
+    start = history_start(generated, 14)
+    sys.stderr.write("[%s] history for %d items that could clear the pre-filter...\n" % (args.server, len(wide)))
+    history_rows = fetch_history_rows(host, set(wide) | inputs_of(db, wide), SELL_MARKETS, start, generated.date())
+    snap = encode_snapshot(args.server, price_rows, history_rows, generated, start, db["built"])
+    size = write_json(args.out or "web/data/live-%s.json" % args.server, snap)
+    sys.stderr.write("[%s] wrote %s: %d priced items, %d with history, %.1f MB\n" % (
+        args.server, args.out or "web/data/live-%s.json" % args.server, len(snap["prices"]),
+        len(snap["history"]), size / 1e6))
+    if args.log_out:
+        # The pilots a visitor with default settings sees, for the track record.
+        opts = default_opts()
+        hist = summarize_history(history_rows, start)
+        default_ids = scan_ids(db, DEFAULT_SCAN_GROUPS, set(range(4, 9)), set(range(0, 4)))
+        stage1 = scan_stage1(db, default_ids, quotes, opts, PREFILTER_MARGIN)
+        final = scan_final(db, [r["item"] for r in stage1[:HISTORY_FOR]], quotes, hist, opts)
+        pilots = [pilot_log_entry(r) for r in final if r["verdict"] == "pilot"]
+        write_json(args.log_out, {"date": generated.date().isoformat(), "server": args.server,
+                                  "generated": generated.isoformat(), "settings": "web defaults",
+                                  "pilots": pilots})
+        sys.stderr.write("[%s] logged %d pilots to %s\n" % (args.server, len(pilots), args.log_out))
+
+
+# --------------------------------------------------------------------------
+# Track record: did past pilots sell at or above break-even?
+# --------------------------------------------------------------------------
+
+def score_pilots(logs, daily):
+    """Score each logged pilot on the 7 days after its scan.
+
+    daily: {(item, city): {date: (units, silver)}}. A pilot made money when the
+    average sale price in those days was at or above its break-even price, and
+    kept its demand when it averaged MIN_DAILY_UNITS a day. A week with no
+    history at all is "no data": AODP only has history when players open charts.
+    """
+    rows = []
+    for log in logs:
+        day0 = datetime.fromisoformat(log["date"]).date()
+        week = {day0 + timedelta(days=i) for i in range(1, 8)}
+        for p in log["pilots"]:
+            series = daily.get((p["item"], p["sell_city"]), {})
+            units = sum(v[0] for d, v in series.items() if d in week)
+            silver = sum(v[1] for d, v in series.items() if d in week)
+            avg = silver / units if units else None
+            rows.append({
+                "date": log["date"], "item": p["item"], "name": p.get("name"), "sell_city": p["sell_city"],
+                "mode": p["mode"], "breakeven_price": p["breakeven_price"], "price": p["price"],
+                "units": units, "avg_price": avg,
+                "made_money": None if avg is None else avg >= p["breakeven_price"],
+                "demand_held": None if avg is None else units / 7.0 >= MIN_DAILY_UNITS,
+            })
+    scored = [r for r in rows if r["made_money"] is not None]
+    return {
+        "pilots": len(rows), "scored": len(scored), "no_data": len(rows) - len(scored),
+        "made_money": sum(1 for r in scored if r["made_money"]),
+        "demand_held": sum(1 for r in scored if r["demand_held"]),
+        "rows": rows,
+    }
+
+
+def cmd_backtest(args):
+    today = now_utc().date()
+    logs = []
+    for path in sorted(Path(args.log_dir).glob("*-%s.json" % args.server)):
+        try:
+            log = json.loads(path.read_text(encoding="utf-8"))
+            age = (today - datetime.fromisoformat(log["date"]).date()).days
+        except (OSError, ValueError, KeyError):
+            continue
+        if args.min_age <= age <= args.max_age:
+            logs.append(log)
+    daily = {}
+    if any(log["pilots"] for log in logs):
+        first = min(datetime.fromisoformat(log["date"]).date() for log in logs) + timedelta(days=1)
+        last = min(today, max(datetime.fromisoformat(log["date"]).date() for log in logs) + timedelta(days=7))
+        pairs = {(p["item"], p["sell_city"]) for log in logs for p in log["pilots"]}
+        rows = fetch_history_rows(HOSTS[args.server], {i for i, _ in pairs}, sorted({c for _, c in pairs}),
+                                  first, last)
+        for row in rows:
+            city = CITY_BY_NORM.get(norm_city(row.get("location")))
+            series = daily.setdefault((row["item_id"], city), {})
+            for d in row.get("data") or []:
+                ts = parse_ts(d.get("timestamp"))
+                if ts is not None:
+                    n, p = d.get("item_count") or 0, d.get("avg_price") or 0
+                    prev = series.get(ts.date(), (0, 0))
+                    series[ts.date()] = (prev[0] + n, prev[1] + n * p)
+    result = dict(score_pilots(logs, daily), generated=now_utc().isoformat(), server=args.server,
+                  days=len(logs), min_age=args.min_age, max_age=args.max_age,
+                  first=min((log["date"] for log in logs), default=None),
+                  last=max((log["date"] for log in logs), default=None))
+    if args.out:
+        write_json(args.out, result)
+    if args.json:
+        out(json.dumps(result, indent=1))
+        return
+    if not result["scored"]:
+        out("Not enough history yet: %d logged scans between %d and %d days old, %d pilots, none with sales data." % (
+            len(logs), args.min_age, args.max_age, result["pilots"]))
+        return
+    out("%s, scans %s to %s: %d pilots, %d with sales data in the following week." % (
+        args.server, result["first"], result["last"], result["pilots"], result["scored"]))
+    out("Sold at or above break-even: %d of %d (%s). Kept %d+ sales a day: %d of %d (%s)." % (
+        result["made_money"], result["scored"], pct(result["made_money"] / result["scored"]),
+        MIN_DAILY_UNITS, result["demand_held"], result["scored"], pct(result["demand_held"] / result["scored"])))
+
+
+# --------------------------------------------------------------------------
+# Game-data check: catch a patch that changes the constants above
+# --------------------------------------------------------------------------
+
+# Rough minimum item counts per scan group; a much smaller index means the dump changed shape.
+MIN_GROUP_ITEMS = {"weapons": 2700, "armor": 1700, "gatherer-gear": 450, "offhands": 350, "capes": 300,
+                   "food": 170, "potions": 130, "refining": 90, "tools": 60, "mounts": 40, "bags": 40}
+# Recipes that must parse exactly like this; a mismatch means the dump format or the game changed.
+CANARY_RECIPES = {
+    "T4_BAG": {"amount": 1, "inputs": [["T4_CLOTH", 8, True], ["T4_LEATHER", 8, True]]},
+    "T4_BAG@1": {"amount": 1, "inputs": [["T4_CLOTH_LEVEL1@1", 8, True], ["T4_LEATHER_LEVEL1@1", 8, True]]},
+    "T4_POTION_HEAL": {"amount": 5, "inputs": [["T4_BURDOCK", 24, True], ["T3_EGG", 6, True]]},
+    "T4_2H_DUALSICKLE_UNDEAD": {"amount": 1, "inputs": [
+        ["T4_METALBAR", 16, True], ["T4_LEATHER", 16, True], ["T4_ARTEFACT_2H_DUALSICKLE_UNDEAD", 1, False]]},
+}
+CANARY_VALUES = {"T4_PLANKS": 16, "T4_CLOTH": 16, "T5_PLANKS": 32, "T4_PLANKS_LEVEL1@1": 32}
+
+
+def find_key(obj, key):
+    """Every value stored under `key` anywhere in a JSON tree."""
+    found = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == key:
+                found.append(v)
+            found.extend(find_key(v, key))
+    elif isinstance(obj, list):
+        for v in obj:
+            found.extend(find_key(v, key))
+    return found
+
+
+def check_modifiers(locations):
+    """Errors when the game's crafting bonuses differ from BASE_BONUS and the specialization tables."""
+    errors = []
+
+    def bonuses(loc):
+        return {m["@name"]: float(m["@value"]) for m in as_list(loc.get("craftingmodifier"))}
+
+    def base(loc, key):
+        v = (loc.get(key) or {}).get("@value")
+        return float(v) if v is not None else None
+    cities = [loc for loc in locations if base(loc, "craftingbonus") == BASE_BONUS
+              and base(loc, "refiningbonus") == BASE_BONUS]
+    if not cities:
+        seen = sorted({base(loc, "craftingbonus") for loc in locations} - {None})
+        return ["no city in game data has a %s base production bonus; game data has %s" % (BASE_BONUS, seen)]
+    matched = set()
+    for city, cats in CRAFT_SPECIALIZATION.items():
+        want = set(cats)
+        hits = [loc for loc in cities
+                if {k for k, v in bonuses(loc).items() if v == CRAFT_SPEC_BONUS} == want]
+        if not hits:
+            best = max(cities, key=lambda loc: len(want & set(bonuses(loc))), default=None)
+            errors.append("%s: no city in game data gives +%.0f%% crafting to exactly %s. Closest: cluster %s %s" % (
+                city, CRAFT_SPEC_BONUS * 100, sorted(want), best and best.get("@clusterid"),
+                best and sorted(bonuses(best).items())))
+            continue
+        loc = hits[0]
+        matched.add(loc.get("@clusterid"))
+        for res, res_city in REFINE_SPECIALIZATION.items():
+            if res_city == city and bonuses(loc).get(res) != REFINE_SPEC_BONUS:
+                errors.append("%s: refining %s bonus is %s in game data, expected %s" % (
+                    city, res, bonuses(loc).get(res), REFINE_SPEC_BONUS))
+    for loc in cities:
+        if loc.get("@clusterid") not in matched:
+            errors.append("game data has a city (cluster %s) with %.0f%% base bonus that the tables do not "
+                          "know: %s" % (loc.get("@clusterid"), BASE_BONUS * 100, sorted(bonuses(loc).items())))
+    return errors
+
+
+def check_index(db):
+    """(errors, warnings) for a recipe index built from the dump."""
+    errors, warnings = [], []
+    counts = {g: 0 for g in SCAN_GROUPS}
+    cats = set()
+    for iid, it in db["items"].items():
+        for g, match in SCAN_GROUPS.items():
+            if match(it):
+                counts[g] += 1
+                if it["cat"] and not specialization_city(it):
+                    cats.add(it["cat"])
+    for g, n in MIN_GROUP_ITEMS.items():
+        if counts.get(g, 0) < n:
+            errors.append("only %d craftable %s items in the index (expected at least %d)" % (counts.get(g, 0), g, n))
+    for iid, want in CANARY_RECIPES.items():
+        it = db["items"].get(iid)
+        got = it and {"amount": it["recipes"][0]["amount"], "inputs": it["recipes"][0]["inputs"]}
+        if got != want:
+            errors.append("recipe for %s parsed as %s, expected %s" % (iid, got, want))
+    for iid, want in CANARY_VALUES.items():
+        if db["values"].get(iid) != want:
+            errors.append("item value of %s is %s, expected %s" % (iid, db["values"].get(iid), want))
+    known = {it["cat"] for it in db["items"].values()}
+    for city, cs in CRAFT_SPECIALIZATION.items():
+        for c in cs:
+            if c not in known:
+                errors.append("%s specializes in '%s', but no item has that crafting category" % (city, c))
+    for c in sorted(cats):
+        warnings.append("scanned items in crafting category '%s' have no specialization city" % c)
+    return errors, warnings, counts
+
+
+def cmd_check_game_data(args):
+    errors, warnings = [], []
+    try:
+        mods = get_json(DUMP_MODIFIERS)
+        gamedata = get_json(DUMP_GAMEDATA)
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        raise SystemExit("Cannot download game data: %s" % e)
+    errors += check_modifiers(as_list((mods.get("craftingmodifiers") or {}).get("craftinglocation")))
+    fees = sorted({float(v) for v in find_key(gamedata, "@maxuseagefee")})
+    if fees != [DEFAULT_FEE_PER_100]:
+        errors.append("station fee cap (maxuseagefee) in game data is %s, expected %s" % (fees, DEFAULT_FEE_PER_100))
+    db = load_db(args)
+    e, w, counts = check_index(db)
+    errors += e
+    warnings += w
+    result = {"checked": now_utc().isoformat(), "ok": not errors, "errors": errors, "warnings": warnings,
+              "recipes_built": db["built"], "group_counts": counts}
+    if args.out:
+        write_json(args.out, result)
+    for x in warnings:
+        sys.stderr.write("warning: %s\n" % x)
+    for x in errors:
+        sys.stderr.write("ERROR: %s\n" % x)
+    if errors:
+        raise SystemExit("Game data no longer matches the constants (%d problems). Check references/economics.md, "
+                         "update the constants, then re-run." % len(errors))
+    out("Game data matches: base bonus, city specializations, station fee cap, and %d recipe and value checks." % (
+        len(CANARY_RECIPES) + len(CANARY_VALUES)))
 
 
 def print_assumptions(args):
     out("Assumptions: %s server, %s, no Focus, quality 1 output, inputs bought instantly at the lowest ask "
-        "in %s, quotes up to %dh old, station fee %s%s, transport %s. Data pulled %s UTC." % (
+        "in %s, quotes up to %dh old, station fee %s%s, transport %s. Data pulled %s UTC. "
+        "Fee and bonus constants last matched game data on %s." % (
             args.server, "Premium (4% tax)" if args.premium else "no Premium (8% tax)",
             ", ".join(args.sources), args.max_age,
             ("%s per craft" % fmt(args.station_fee)) if args.station_fee is not None
             else ("%s per 100 nutrition" % fmt(args.fee_per_100)),
             (", daily bonus +%.0f%%" % (args.daily_bonus * 100)) if args.daily_bonus else "",
             ("%s per craft" % fmt(args.transport)) if args.transport is not None else "not included",
-            now_utc().strftime("%Y-%m-%d %H:%M")))
+            now_utc().strftime("%Y-%m-%d %H:%M"), GAME_DATA_CHECKED))
     out("")
 
 
@@ -1118,9 +1641,9 @@ def main(argv=None):
     p.add_argument("--max-tier", type=int, default=8)
     p.add_argument("--min-enchant", type=int, default=0)
     p.add_argument("--max-enchant", type=int, default=3)
-    p.add_argument("--prefilter-margin", type=float, default=0.05,
+    p.add_argument("--prefilter-margin", type=float, default=PREFILTER_MARGIN,
                    help="minimum margin on current quotes before history check")
-    p.add_argument("--history-for", type=int, default=400, help="how many leads get a history check")
+    p.add_argument("--history-for", type=int, default=HISTORY_FOR, help="how many leads get a history check")
     p.add_argument("--top", type=int, default=20)
     add_common(p)
     add_econ(p)
@@ -1130,6 +1653,25 @@ def main(argv=None):
     p.add_argument("--out", default="web/data/index.json")
     add_common(p, market=False)
     p.set_defaults(func=cmd_export_index)
+
+    p = sub.add_parser("snapshot", help="write the market snapshot the web app shows on load")
+    p.add_argument("--out", help="default: web/data/live-SERVER.json")
+    p.add_argument("--log-out", help="also write today's default-settings pilots here, for the track record")
+    add_common(p)
+    p.set_defaults(func=cmd_snapshot)
+
+    p = sub.add_parser("check-game-data", help="compare the constants with the latest game data")
+    p.add_argument("--out", help="also write the result as JSON here")
+    add_common(p, market=False)
+    p.set_defaults(func=cmd_check_game_data)
+
+    p = sub.add_parser("backtest", help="score past pilots against the sales that followed")
+    p.add_argument("--log-dir", required=True, help="folder of snapshot --log-out files (the scan-log branch)")
+    p.add_argument("--min-age", type=int, default=8, help="ignore scans younger than this many days")
+    p.add_argument("--max-age", type=int, default=30, help="ignore scans older than this many days")
+    p.add_argument("--out", help="also write the result as JSON here")
+    add_common(p)
+    p.set_defaults(func=cmd_backtest)
 
     args = ap.parse_args(argv)
     if hasattr(args, "premium"):

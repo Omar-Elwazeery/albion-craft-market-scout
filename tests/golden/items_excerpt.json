@@ -1,0 +1,1308 @@
+{
+ "source": "ao-data/ao-bin-dumps items.json and formatted/items.json, captured 2026-10-08",
+ "items_json": {
+  "items": {
+   "farmableitem": [
+    {
+     "@uniquename": "T5_FARM_MOABIRD_FW_BRIDGEWATCH_BABY",
+     "@tier": "5",
+     "@placefame": "0",
+     "@pickupable": "true",
+     "@destroyable": "false",
+     "@unlockedtoplace": "false",
+     "@maxstacksize": "999",
+     "@shopcategory": "farming",
+     "@shopsubcategory1": "kennel",
+     "@kind": "animal",
+     "@weight": "1.5",
+     "@unlockedtocraft": "true",
+     "@animationid": "breed",
+     "@prefabname": "FARM_MOABIRD_FW_BRIDGEWATCH_BABY_01",
+     "@prefabscale": "0.5",
+     "@resourcevalue": "0",
+     "@activefarmfocuscost": "1000",
+     "@activefarmmaxcycles": "3",
+     "@activefarmactiondurationseconds": "1",
+     "@activefarmcyclelengthseconds": "79200",
+     "@activefarmbonus": "0.1",
+     "@shopsubcategory2": "babys",
+     "@shopsubcategory3": "moabird",
+     "craftingrequirements": {
+      "@time": "0",
+      "@swaptransaction": "true",
+      "playerfactionstanding": {
+       "@faction": "Steppe",
+       "@minstanding": "120000"
+      },
+      "currency": {
+       "@uniquename": "FACTION_STEPPE",
+       "@amount": "3000"
+      }
+     },
+     "AudioInfo": {
+      "@name": "FARMABLE_MOABIRD_BABY"
+     },
+     "grownitem": {
+      "@uniquename": "T5_FARM_MOABIRD_FW_BRIDGEWATCH_GROWN",
+      "@growtime": "504000",
+      "@fame": "300",
+      "offspring": {
+       "@chance": "0.0",
+       "@amount": "1"
+      }
+     },
+     "consumption": {
+      "food": {
+       "@nutritionmax": "1488",
+       "@secondspernutrition": "116.67",
+       "@lossbeforehungry": "48",
+       "@hungryoverheadicon": "FX/ClientPrefabs/fx_farming_focus_icon_vegetable",
+       "acceptedfood": {
+        "@foodcategory": "plants"
+       }
+      }
+     }
+    },
+    {
+     "@uniquename": "T5_FARM_OWL_FW_BRECILIEN_BABY",
+     "@uisprite": "T5_FARM_OWL_FW_BRECILIEN_BABY",
+     "@tier": "5",
+     "@placefame": "0",
+     "@pickupable": "true",
+     "@destroyable": "false",
+     "@unlockedtoplace": "false",
+     "@maxstacksize": "999",
+     "@shopcategory": "farming",
+     "@shopsubcategory1": "kennel",
+     "@kind": "animal",
+     "@weight": "1.5",
+     "@unlockedtocraft": "true",
+     "@animationid": "breed",
+     "@prefabname": "FARM_OWL_FW_BRECILIEN_BABY",
+     "@prefabscale": "1",
+     "@resourcevalue": "0",
+     "@activefarmfocuscost": "1000",
+     "@activefarmmaxcycles": "3",
+     "@activefarmactiondurationseconds": "1",
+     "@activefarmcyclelengthseconds": "79200",
+     "@activefarmbonus": "0.1",
+     "@shopsubcategory2": "babys",
+     "@shopsubcategory3": "owl",
+     "craftingrequirements": {
+      "@time": "0",
+      "@swaptransaction": "true",
+      "currency": {
+       "@uniquename": "FAVOR",
+       "@amount": "675"
+      },
+      "standing": {
+       "@type": "mistcity",
+       "@minstanding": "1800000"
+      }
+     },
+     "AudioInfo": {
+      "@name": "FARMABLE_OWL_BABY"
+     },
+     "grownitem": {
+      "@uniquename": "T5_FARM_OWL_FW_BRECILIEN_GROWN",
+      "@growtime": "504000",
+      "@fame": "300",
+      "offspring": {
+       "@chance": "0.0",
+       "@amount": "1"
+      }
+     },
+     "consumption": {
+      "food": {
+       "@nutritionmax": "1488",
+       "@secondspernutrition": "116.67",
+       "@lossbeforehungry": "57",
+       "@hungryoverheadicon": "FX/ClientPrefabs/fx_farming_focus_icon_meat",
+       "acceptedfood": {
+        "@foodcategory": "meat"
+       }
+      }
+     }
+    }
+   ],
+   "simpleitem": [
+    {
+     "@uniquename": "T4_PLANKS",
+     "@shopcategory": "crafting",
+     "@shopsubcategory1": "refinedresources",
+     "@craftingcategory": "wood",
+     "@tier": "4",
+     "@weight": "0.51",
+     "@maxstacksize": "999",
+     "@uicraftsoundstart": "Play_ui_action_craft_refine_wood_start",
+     "@uicraftsoundfinish": "Play_ui_action_craft_refine_wood_finish",
+     "@fasttravelfactor": "2",
+     "@itemvalue": "16",
+     "@enchantmentlevel": "0",
+     "@descriptionlocatag": "@ITEMS_REFINED_RESOURCE_DESC",
+     "@shopsubcategory2": "planks",
+     "craftingrequirements": [
+      {
+       "@silver": "0",
+       "@time": "0.04167",
+       "@craftingfocus": "54",
+       "@amountcrafted": "1",
+       "@craftbuttonlocaoverride": "@CRAFTBUILDING_ITEM_DETAILS_BUTTON_REFINE",
+       "craftresource": [
+        {
+         "@uniquename": "T4_WOOD",
+         "@count": "2",
+         "@enchantmentlevel": "0"
+        },
+        {
+         "@uniquename": "T3_PLANKS",
+         "@count": "1",
+         "@enchantmentlevel": "0"
+        }
+       ]
+      },
+      {
+       "@silver": "0",
+       "@time": "0.04167",
+       "@craftingfocus": "54",
+       "@amountcrafted": "1",
+       "@craftbuttonlocaoverride": "@CRAFTBUILDING_ITEM_DETAILS_BUTTON_REFINE",
+       "craftresource": [
+        {
+         "@uniquename": "T4_WOOD",
+         "@count": "1",
+         "@enchantmentlevel": "0"
+        },
+        {
+         "@uniquename": "T1_FACTION_FOREST_TOKEN_1",
+         "@count": "1"
+        },
+        {
+         "@uniquename": "T3_PLANKS",
+         "@count": "1",
+         "@enchantmentlevel": "0"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "@uniquename": "T5_PLANKS",
+     "@shopcategory": "crafting",
+     "@shopsubcategory1": "refinedresources",
+     "@craftingcategory": "wood",
+     "@tier": "5",
+     "@weight": "0.76",
+     "@maxstacksize": "999",
+     "@uicraftsoundstart": "Play_ui_action_craft_refine_wood_start",
+     "@uicraftsoundfinish": "Play_ui_action_craft_refine_wood_finish",
+     "@fasttravelfactor": "4",
+     "@itemvalue": "32",
+     "@enchantmentlevel": "0",
+     "@descriptionlocatag": "@ITEMS_REFINED_RESOURCE_DESC",
+     "@shopsubcategory2": "planks",
+     "craftingrequirements": [
+      {
+       "@silver": "0",
+       "@time": "0.0625",
+       "@craftingfocus": "94",
+       "@amountcrafted": "1",
+       "@craftbuttonlocaoverride": "@CRAFTBUILDING_ITEM_DETAILS_BUTTON_REFINE",
+       "craftresource": [
+        {
+         "@uniquename": "T5_WOOD",
+         "@count": "3",
+         "@enchantmentlevel": "0"
+        },
+        {
+         "@uniquename": "T4_PLANKS",
+         "@count": "1",
+         "@enchantmentlevel": "0"
+        }
+       ]
+      },
+      {
+       "@silver": "0",
+       "@time": "0.0625",
+       "@craftingfocus": "94",
+       "@amountcrafted": "1",
+       "@craftbuttonlocaoverride": "@CRAFTBUILDING_ITEM_DETAILS_BUTTON_REFINE",
+       "craftresource": [
+        {
+         "@uniquename": "T5_WOOD",
+         "@count": "2",
+         "@enchantmentlevel": "0"
+        },
+        {
+         "@uniquename": "T1_FACTION_FOREST_TOKEN_1",
+         "@count": "1"
+        },
+        {
+         "@uniquename": "T4_PLANKS",
+         "@count": "1",
+         "@enchantmentlevel": "0"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "@uniquename": "T4_LEATHER",
+     "@shopcategory": "crafting",
+     "@shopsubcategory1": "refinedresources",
+     "@craftingcategory": "hide",
+     "@tier": "4",
+     "@weight": "0.51",
+     "@maxstacksize": "999",
+     "@uicraftsoundstart": "Play_ui_action_craft_refine_hide_start",
+     "@uicraftsoundfinish": "Play_ui_action_craft_refine_hide_finish",
+     "@fasttravelfactor": "2",
+     "@itemvalue": "16",
+     "@enchantmentlevel": "0",
+     "@descriptionlocatag": "@ITEMS_REFINED_RESOURCE_DESC",
+     "@shopsubcategory2": "leather",
+     "craftingrequirements": [
+      {
+       "@silver": "0",
+       "@time": "0.04167",
+       "@craftingfocus": "54",
+       "@amountcrafted": "1",
+       "@craftbuttonlocaoverride": "@CRAFTBUILDING_ITEM_DETAILS_BUTTON_REFINE",
+       "craftresource": [
+        {
+         "@uniquename": "T4_HIDE",
+         "@count": "2",
+         "@enchantmentlevel": "0"
+        },
+        {
+         "@uniquename": "T3_LEATHER",
+         "@count": "1",
+         "@enchantmentlevel": "0"
+        }
+       ]
+      },
+      {
+       "@silver": "0",
+       "@time": "0.04167",
+       "@craftingfocus": "54",
+       "@amountcrafted": "1",
+       "@craftbuttonlocaoverride": "@CRAFTBUILDING_ITEM_DETAILS_BUTTON_REFINE",
+       "craftresource": [
+        {
+         "@uniquename": "T4_HIDE",
+         "@count": "1",
+         "@enchantmentlevel": "0"
+        },
+        {
+         "@uniquename": "T1_FACTION_STEPPE_TOKEN_1",
+         "@count": "1"
+        },
+        {
+         "@uniquename": "T3_LEATHER",
+         "@count": "1",
+         "@enchantmentlevel": "0"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "@uniquename": "T4_CLOTH",
+     "@shopcategory": "crafting",
+     "@shopsubcategory1": "refinedresources",
+     "@craftingcategory": "fiber",
+     "@tier": "4",
+     "@weight": "0.51",
+     "@maxstacksize": "999",
+     "@uicraftsoundstart": "Play_ui_action_craft_refine_fiber_start",
+     "@uicraftsoundfinish": "Play_ui_action_craft_refine_fiber_finish",
+     "@fasttravelfactor": "2",
+     "@itemvalue": "16",
+     "@enchantmentlevel": "0",
+     "@descriptionlocatag": "@ITEMS_REFINED_RESOURCE_DESC",
+     "@shopsubcategory2": "cloth",
+     "craftingrequirements": [
+      {
+       "@silver": "0",
+       "@time": "0.04167",
+       "@craftingfocus": "54",
+       "@amountcrafted": "1",
+       "@craftbuttonlocaoverride": "@CRAFTBUILDING_ITEM_DETAILS_BUTTON_REFINE",
+       "craftresource": [
+        {
+         "@uniquename": "T4_FIBER",
+         "@count": "2",
+         "@enchantmentlevel": "0"
+        },
+        {
+         "@uniquename": "T3_CLOTH",
+         "@count": "1",
+         "@enchantmentlevel": "0"
+        }
+       ]
+      },
+      {
+       "@silver": "0",
+       "@time": "0.04167",
+       "@craftingfocus": "54",
+       "@amountcrafted": "1",
+       "@craftbuttonlocaoverride": "@CRAFTBUILDING_ITEM_DETAILS_BUTTON_REFINE",
+       "craftresource": [
+        {
+         "@uniquename": "T4_FIBER",
+         "@count": "1",
+         "@enchantmentlevel": "0"
+        },
+        {
+         "@uniquename": "T1_FACTION_SWAMP_TOKEN_1",
+         "@count": "1"
+        },
+        {
+         "@uniquename": "T3_CLOTH",
+         "@count": "1",
+         "@enchantmentlevel": "0"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "consumableitem": [
+    {
+     "@uniquename": "T4_POTION_HEAL",
+     "@uisprite": "POTION_HEALTH",
+     "@abilitypower": "186",
+     "@slottype": "potion",
+     "@consumespell": "POTION_HEAL_P3",
+     "@shopcategory": "consumables",
+     "@shopsubcategory1": "potions",
+     "@craftingcategory": "potion",
+     "@tier": "4",
+     "@dummyitempower": "700",
+     "@maxstacksize": "999",
+     "@unlockedtocraft": "false",
+     "@unlockedtoequip": "true",
+     "@uicraftsoundstart": "Play_ui_action_craft_potion_start",
+     "@uicraftsoundfinish": "Play_ui_action_craft_potion_finish",
+     "@weight": "0.3",
+     "@descriptionlocatag": "@ITEMS_POTION_HEAL_DESC",
+     "@shopsubcategory2": "heal",
+     "craftingrequirements": {
+      "@silver": "0",
+      "@amountcrafted": "5",
+      "@forcesinglecraft": "false",
+      "@craftingfocus": "210",
+      "@time": "0.48",
+      "craftresource": [
+       {
+        "@uniquename": "T4_BURDOCK",
+        "@count": "24"
+       },
+       {
+        "@uniquename": "T3_EGG",
+        "@count": "6"
+       }
+      ]
+     },
+     "enchantments": {
+      "enchantment": [
+       {
+        "@enchantmentlevel": "1",
+        "@consumespell": "POTION_HEAL_P4",
+        "@dummyitempower": "800",
+        "@abilitypower": "186",
+        "craftingrequirements": {
+         "@time": "0.48",
+         "@amountcrafted": "5",
+         "@craftingfocus": "277",
+         "craftresource": [
+          {
+           "@uniquename": "T4_BURDOCK",
+           "@count": "24"
+          },
+          {
+           "@uniquename": "T3_EGG",
+           "@count": "6"
+          },
+          {
+           "@uniquename": "T1_ALCHEMY_EXTRACT_LEVEL1",
+           "@count": "15"
+          }
+         ]
+        },
+        "upgraderequirements": {
+         "upgraderesource": {
+          "@uniquename": "T1_ALCHEMY_EXTRACT_LEVEL1",
+          "@count": "3"
+         }
+        }
+       },
+       {
+        "@enchantmentlevel": "2",
+        "@consumespell": "POTION_HEAL_P5",
+        "@dummyitempower": "900",
+        "@abilitypower": "186",
+        "craftingrequirements": {
+         "@time": "0.48",
+         "@amountcrafted": "5",
+         "@craftingfocus": "411",
+         "craftresource": [
+          {
+           "@uniquename": "T4_BURDOCK",
+           "@count": "24"
+          },
+          {
+           "@uniquename": "T3_EGG",
+           "@count": "6"
+          },
+          {
+           "@uniquename": "T1_ALCHEMY_EXTRACT_LEVEL2",
+           "@count": "15"
+          }
+         ]
+        },
+        "upgraderequirements": {
+         "upgraderesource": {
+          "@uniquename": "T1_ALCHEMY_EXTRACT_LEVEL2",
+          "@count": "3"
+         }
+        }
+       },
+       {
+        "@enchantmentlevel": "3",
+        "@consumespell": "POTION_HEAL_P6",
+        "@dummyitempower": "1000",
+        "@abilitypower": "186",
+        "craftingrequirements": {
+         "@time": "0.48",
+         "@amountcrafted": "5",
+         "@craftingfocus": "811",
+         "craftresource": [
+          {
+           "@uniquename": "T4_BURDOCK",
+           "@count": "24"
+          },
+          {
+           "@uniquename": "T3_EGG",
+           "@count": "6"
+          },
+          {
+           "@uniquename": "T1_ALCHEMY_EXTRACT_LEVEL3",
+           "@count": "15"
+          }
+         ]
+        },
+        "upgraderequirements": {
+         "upgraderesource": {
+          "@uniquename": "T1_ALCHEMY_EXTRACT_LEVEL3",
+          "@count": "3"
+         }
+        }
+       }
+      ]
+     }
+    }
+   ],
+   "equipmentitem": [
+    {
+     "@uniquename": "T4_CAPEITEM_FW_MARTLOCK",
+     "@maxqualitylevel": "5",
+     "@abilitypower": "100",
+     "@slottype": "cape",
+     "@shopcategory": "capes",
+     "@shopsubcategory1": "accessoires_capes_martlock",
+     "@tier": "4",
+     "@weight": "1.7",
+     "@activespellslots": "0",
+     "@passivespellslots": "1",
+     "@physicalarmor": "0",
+     "@magicresistance": "0",
+     "@crowdcontrolresistance": "0",
+     "@durability": "9900",
+     "@durabilityloss_attack": "1",
+     "@durabilityloss_spelluse": "1",
+     "@durabilityloss_receivedattack": "1",
+     "@durabilityloss_receivedspell": "1",
+     "@hitpointsmax": "0",
+     "@hitpointsregenerationbonus": "0",
+     "@energymax": "0",
+     "@energyregenerationbonus": "0",
+     "@unlockedtocraft": "true",
+     "@unlockedtoequip": "false",
+     "@physicalspelldamagebonus": "0",
+     "@magicspelldamagebonus": "0",
+     "@healbonus": "0",
+     "@itempower": "700",
+     "@physicalattackdamagebonus": "0",
+     "@magicattackdamagebonus": "0",
+     "@bonusccdurationvsplayers": "0",
+     "@bonusccdurationvsmobs": "0",
+     "@threatbonus": "0",
+     "@itempowerprogressiontype": "cape",
+     "@magiccooldownreduction": "0",
+     "@bonusdefensevsplayers": "0",
+     "@bonusdefensevsmobs": "0",
+     "@magiccasttimereduction": "0",
+     "@attackspeedbonus": "0",
+     "@movespeedbonus": "0",
+     "@uicraftsoundstart": "Play_ui_action_craft_plate_start",
+     "@uicraftsoundfinish": "Play_ui_action_craft_plate_finish",
+     "@healmodifier": "0",
+     "@canbeovercharged": "false",
+     "@showinmarketplace": "true",
+     "@energycostreduction": "0",
+     "@masterymodifier": "0",
+     "@famevalue": "0",
+     "craftingrequirements": {
+      "@silver": "0",
+      "@time": "0.333",
+      "@craftingfocus": "0",
+      "craftresource": [
+       {
+        "@uniquename": "T4_CAPE",
+        "@count": "1",
+        "@maxreturnamount": "0",
+        "@preservequality": "true"
+       },
+       {
+        "@uniquename": "T4_CAPEITEM_FW_MARTLOCK_BP",
+        "@count": "1",
+        "@maxreturnamount": "0"
+       },
+       {
+        "@uniquename": "T1_FACTION_HIGHLAND_TOKEN_1",
+        "@count": "1",
+        "@maxreturnamount": "0"
+       }
+      ]
+     },
+     "craftingspelllist": {
+      "craftspell": {
+       "@uniquename": "PASSIVE_CAPE_MARTLOCK"
+      }
+     },
+     "enchantments": {
+      "enchantment": [
+       {
+        "@enchantmentlevel": "1",
+        "@itempower": "800",
+        "@durability": "14850",
+        "craftingrequirements": {
+         "@silver": "0",
+         "@time": "0.5",
+         "@craftingfocus": "0",
+         "craftresource": [
+          {
+           "@uniquename": "T4_CAPE",
+           "@enchantmentlevel": "1",
+           "@count": "1",
+           "@maxreturnamount": "0",
+           "@preservequality": "true"
+          },
+          {
+           "@uniquename": "T4_CAPEITEM_FW_MARTLOCK_BP",
+           "@count": "1",
+           "@maxreturnamount": "0"
+          },
+          {
+           "@uniquename": "T1_FACTION_HIGHLAND_TOKEN_1",
+           "@count": "1",
+           "@maxreturnamount": "0"
+          }
+         ]
+        },
+        "upgraderequirements": {
+         "upgraderesource": {
+          "@uniquename": "T4_RUNE",
+          "@count": "96"
+         }
+        }
+       },
+       {
+        "@enchantmentlevel": "2",
+        "@itempower": "900",
+        "@durability": "22275",
+        "craftingrequirements": {
+         "@silver": "0",
+         "@time": "0.667",
+         "@craftingfocus": "0",
+         "craftresource": [
+          {
+           "@uniquename": "T4_CAPE",
+           "@enchantmentlevel": "2",
+           "@count": "1",
+           "@maxreturnamount": "0",
+           "@preservequality": "true"
+          },
+          {
+           "@uniquename": "T4_CAPEITEM_FW_MARTLOCK_BP",
+           "@count": "1",
+           "@maxreturnamount": "0"
+          },
+          {
+           "@uniquename": "T1_FACTION_HIGHLAND_TOKEN_1",
+           "@count": "1",
+           "@maxreturnamount": "0"
+          }
+         ]
+        },
+        "upgraderequirements": {
+         "upgraderesource": {
+          "@uniquename": "T4_SOUL",
+          "@count": "96"
+         }
+        }
+       },
+       {
+        "@enchantmentlevel": "3",
+        "@itempower": "1000",
+        "@durability": "33413",
+        "craftingrequirements": {
+         "@silver": "0",
+         "@time": "0.833",
+         "@craftingfocus": "0",
+         "craftresource": [
+          {
+           "@uniquename": "T4_CAPE",
+           "@enchantmentlevel": "3",
+           "@count": "1",
+           "@maxreturnamount": "0",
+           "@preservequality": "true"
+          },
+          {
+           "@uniquename": "T4_CAPEITEM_FW_MARTLOCK_BP",
+           "@count": "1",
+           "@maxreturnamount": "0"
+          },
+          {
+           "@uniquename": "T1_FACTION_HIGHLAND_TOKEN_1",
+           "@count": "1",
+           "@maxreturnamount": "0"
+          }
+         ]
+        },
+        "upgraderequirements": {
+         "upgraderesource": {
+          "@uniquename": "T4_RELIC",
+          "@count": "96"
+         }
+        }
+       },
+       {
+        "@enchantmentlevel": "4",
+        "@itempower": "1100",
+        "@durability": "50119",
+        "craftingrequirements": {
+         "@silver": "0",
+         "@time": "1.25",
+         "@craftingfocus": "0",
+         "craftresource": [
+          {
+           "@uniquename": "T4_CAPE",
+           "@enchantmentlevel": "4",
+           "@count": "1",
+           "@maxreturnamount": "0",
+           "@preservequality": "true"
+          },
+          {
+           "@uniquename": "T4_CAPEITEM_FW_MARTLOCK_BP",
+           "@count": "1",
+           "@maxreturnamount": "0"
+          },
+          {
+           "@uniquename": "T1_FACTION_HIGHLAND_TOKEN_1",
+           "@count": "1",
+           "@maxreturnamount": "0"
+          }
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "@uniquename": "T4_BAG",
+     "@maxqualitylevel": "5",
+     "@abilitypower": "100",
+     "@slottype": "bag",
+     "@craftingcategory": "bag",
+     "@shopcategory": "bags",
+     "@shopsubcategory1": "bags",
+     "@tier": "4",
+     "@weight": "3.4",
+     "@activespellslots": "0",
+     "@passivespellslots": "1",
+     "@durability": "9000",
+     "@durabilityloss_attack": "1",
+     "@durabilityloss_spelluse": "1",
+     "@durabilityloss_receivedattack": "1",
+     "@durabilityloss_receivedspell": "1",
+     "@itempower": "700",
+     "@hitpointsmax": "0",
+     "@hitpointsregenerationbonus": "0",
+     "@energymax": "0",
+     "@energyregenerationbonus": "0",
+     "@crowdcontrolresistance": "0",
+     "@physicalarmor": "0",
+     "@magicresistance": "0",
+     "@unlockedtocraft": "false",
+     "@unlockedtoequip": "false",
+     "@physicalattackdamagebonus": "0",
+     "@magicattackdamagebonus": "0",
+     "@physicalspelldamagebonus": "0",
+     "@magicspelldamagebonus": "0",
+     "@healbonus": "0",
+     "@bonusccdurationvsplayers": "0",
+     "@bonusccdurationvsmobs": "0",
+     "@threatbonus": "0",
+     "@itempowerprogressiontype": "bag",
+     "@magiccooldownreduction": "0",
+     "@bonusdefensevsplayers": "0",
+     "@bonusdefensevsmobs": "0",
+     "@magiccasttimereduction": "0",
+     "@attackspeedbonus": "0",
+     "@movespeedbonus": "0",
+     "@uicraftsoundstart": "Play_ui_action_craft_leather_start",
+     "@uicraftsoundfinish": "Play_ui_action_craft_leather_finish",
+     "@healmodifier": "0",
+     "@canbeovercharged": "false",
+     "@showinmarketplace": "true",
+     "@energycostreduction": "0",
+     "@masterymodifier": "0",
+     "craftingrequirements": {
+      "@silver": "0",
+      "@time": "0.667",
+      "@craftingfocus": "858",
+      "craftresource": [
+       {
+        "@uniquename": "T4_CLOTH",
+        "@count": "8"
+       },
+       {
+        "@uniquename": "T4_LEATHER",
+        "@count": "8"
+       }
+      ]
+     },
+     "craftingspelllist": {
+      "@reference": "T2_BAG"
+     },
+     "enchantments": {
+      "enchantment": [
+       {
+        "@enchantmentlevel": "1",
+        "@itempower": "800",
+        "@durability": "13500",
+        "craftingrequirements": {
+         "@silver": "0",
+         "@time": "1",
+         "@craftingfocus": "1501",
+         "craftresource": [
+          {
+           "@uniquename": "T4_CLOTH_LEVEL1",
+           "@enchantmentlevel": "1",
+           "@count": "8"
+          },
+          {
+           "@uniquename": "T4_LEATHER_LEVEL1",
+           "@enchantmentlevel": "1",
+           "@count": "8"
+          }
+         ]
+        },
+        "upgraderequirements": {
+         "upgraderesource": {
+          "@uniquename": "T4_RUNE",
+          "@count": "192"
+         }
+        }
+       },
+       {
+        "@enchantmentlevel": "2",
+        "@itempower": "900",
+        "@durability": "20250",
+        "craftingrequirements": {
+         "@silver": "0",
+         "@time": "1.333",
+         "@craftingfocus": "2626",
+         "craftresource": [
+          {
+           "@uniquename": "T4_CLOTH_LEVEL2",
+           "@enchantmentlevel": "2",
+           "@count": "8"
+          },
+          {
+           "@uniquename": "T4_LEATHER_LEVEL2",
+           "@enchantmentlevel": "2",
+           "@count": "8"
+          }
+         ]
+        },
+        "upgraderequirements": {
+         "upgraderesource": {
+          "@uniquename": "T4_SOUL",
+          "@count": "192"
+         }
+        }
+       },
+       {
+        "@enchantmentlevel": "3",
+        "@itempower": "1000",
+        "@durability": "30375",
+        "craftingrequirements": {
+         "@silver": "0",
+         "@time": "1.667",
+         "@craftingfocus": "4596",
+         "craftresource": [
+          {
+           "@uniquename": "T4_CLOTH_LEVEL3",
+           "@enchantmentlevel": "3",
+           "@count": "8"
+          },
+          {
+           "@uniquename": "T4_LEATHER_LEVEL3",
+           "@enchantmentlevel": "3",
+           "@count": "8"
+          }
+         ]
+        },
+        "upgraderequirements": {
+         "upgraderesource": {
+          "@uniquename": "T4_RELIC",
+          "@count": "192"
+         }
+        }
+       },
+       {
+        "@enchantmentlevel": "4",
+        "@itempower": "1100",
+        "@durability": "45563",
+        "craftingrequirements": {
+         "@silver": "0",
+         "@time": "2.5",
+         "@craftingfocus": "8042",
+         "craftresource": [
+          {
+           "@uniquename": "T4_CLOTH_LEVEL4",
+           "@enchantmentlevel": "4",
+           "@count": "8"
+          },
+          {
+           "@uniquename": "T4_LEATHER_LEVEL4",
+           "@enchantmentlevel": "4",
+           "@count": "8"
+          }
+         ]
+        }
+       }
+      ]
+     }
+    }
+   ],
+   "weapon": [
+    {
+     "@uniquename": "T4_2H_DUALSICKLE_UNDEAD",
+     "@maxqualitylevel": "5",
+     "@abilitypower": "144",
+     "@physicalspelldamagebonus": "0",
+     "@magicspelldamagebonus": "0",
+     "@slottype": "mainhand",
+     "@shopcategory": "weapons",
+     "@shopsubcategory1": "dagger",
+     "@attacktype": "melee",
+     "@mainhandanimationtype": "dualdagger",
+     "@attackdamage": "19",
+     "@attackspeed": "2.5",
+     "@twohanded": "true",
+     "@attackrange": "1.5",
+     "@tier": "4",
+     "@weight": "6.8",
+     "@activespellslots": "3",
+     "@passivespellslots": "1",
+     "@durability": "42882",
+     "@durabilityloss_attack": "1",
+     "@durabilityloss_spelluse": "1",
+     "@durabilityloss_receivedattack": "1",
+     "@durabilityloss_receivedspell": "1",
+     "@unlockedtocraft": "false",
+     "@unlockedtoequip": "false",
+     "@hitpointsmax": "0",
+     "@itempower": "775",
+     "@hitpointsregenerationbonus": "0",
+     "@itempowerprogressiontype": "mainhand",
+     "@showinmarketplace": "true",
+     "@focusfireprotectionpenetration": "0",
+     "@uicraftsoundstart": "Play_ui_action_craft_metal_start",
+     "@uicraftsoundfinish": "Play_ui_action_craft_metal_finish",
+     "@craftingcategory": "dagger",
+     "@healmodifier": "0",
+     "@canbeovercharged": "true",
+     "@masterymodifier": "0",
+     "@destinyandjournalcraftfamefactor": "1.3",
+     "@combatspecachievement": "COMBAT_DAGGERS_UNDEAD",
+     "@physicalattackdamagebonus": "0",
+     "@magicattackdamagebonus": "0",
+     "@shopsubcategory2": "dagger_undead",
+     "craftingrequirements": [
+      {
+       "@silver": "0",
+       "@time": "1.333",
+       "@craftingfocus": "1715",
+       "craftresource": [
+        {
+         "@uniquename": "T4_METALBAR",
+         "@count": "16"
+        },
+        {
+         "@uniquename": "T4_LEATHER",
+         "@count": "16"
+        },
+        {
+         "@uniquename": "T4_ARTEFACT_2H_DUALSICKLE_UNDEAD",
+         "@count": "1",
+         "@maxreturnamount": "0"
+        }
+       ]
+      },
+      {
+       "@craftingfocus": "1715",
+       "@time": "1.333",
+       "craftresource": [
+        {
+         "@uniquename": "T4_METALBAR",
+         "@count": "16"
+        },
+        {
+         "@uniquename": "T4_LEATHER",
+         "@count": "16"
+        },
+        {
+         "@uniquename": "T4_ARTEFACT_TOKEN_FAVOR_3",
+         "@count": "1",
+         "@maxreturnamount": "0"
+        }
+       ]
+      }
+     ],
+     "SocketPreset": {
+      "@name": "DUALHAND"
+     },
+     "craftingspelllist": {
+      "@reference": "T4_MAIN_DAGGER",
+      "removespell": {
+       "@uniquename": "BLOODTHIRSTYBLADE"
+      },
+      "craftspell": {
+       "@uniquename": "GHOSTSTRIKE",
+       "@slots": "3",
+       "@tag": "A"
+      }
+     },
+     "AudioInfo": {
+      "@name": "ITEM_DAGGER_SMALL"
+     },
+     "enchantments": {
+      "enchantment": [
+       {
+        "@enchantmentlevel": "1",
+        "@itempower": "875",
+        "@durability": "64323",
+        "craftingrequirements": [
+         {
+          "@silver": "0",
+          "@time": "2",
+          "@craftingfocus": "3001",
+          "craftresource": [
+           {
+            "@uniquename": "T4_METALBAR_LEVEL1",
+            "@enchantmentlevel": "1",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_LEATHER_LEVEL1",
+            "@enchantmentlevel": "1",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_ARTEFACT_2H_DUALSICKLE_UNDEAD",
+            "@count": "1",
+            "@maxreturnamount": "0"
+           }
+          ]
+         },
+         {
+          "@silver": "0",
+          "@time": "2",
+          "@craftingfocus": "3001",
+          "craftresource": [
+           {
+            "@uniquename": "T4_METALBAR_LEVEL1",
+            "@enchantmentlevel": "1",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_LEATHER_LEVEL1",
+            "@enchantmentlevel": "1",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_ARTEFACT_TOKEN_FAVOR_3",
+            "@count": "1",
+            "@maxreturnamount": "0"
+           }
+          ]
+         }
+        ],
+        "upgraderequirements": {
+         "upgraderesource": {
+          "@uniquename": "T4_RUNE",
+          "@count": "384"
+         }
+        }
+       },
+       {
+        "@enchantmentlevel": "2",
+        "@itempower": "975",
+        "@durability": "96485",
+        "craftingrequirements": [
+         {
+          "@silver": "0",
+          "@time": "2.667",
+          "@craftingfocus": "5252",
+          "craftresource": [
+           {
+            "@uniquename": "T4_METALBAR_LEVEL2",
+            "@enchantmentlevel": "2",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_LEATHER_LEVEL2",
+            "@enchantmentlevel": "2",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_ARTEFACT_2H_DUALSICKLE_UNDEAD",
+            "@count": "1",
+            "@maxreturnamount": "0"
+           }
+          ]
+         },
+         {
+          "@silver": "0",
+          "@time": "2.667",
+          "@craftingfocus": "5252",
+          "craftresource": [
+           {
+            "@uniquename": "T4_METALBAR_LEVEL2",
+            "@enchantmentlevel": "2",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_LEATHER_LEVEL2",
+            "@enchantmentlevel": "2",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_ARTEFACT_TOKEN_FAVOR_3",
+            "@count": "1",
+            "@maxreturnamount": "0"
+           }
+          ]
+         }
+        ],
+        "upgraderequirements": {
+         "upgraderesource": {
+          "@uniquename": "T4_SOUL",
+          "@count": "384"
+         }
+        }
+       },
+       {
+        "@enchantmentlevel": "3",
+        "@itempower": "1075",
+        "@durability": "144727",
+        "craftingrequirements": [
+         {
+          "@silver": "0",
+          "@time": "3.333",
+          "@craftingfocus": "9191",
+          "craftresource": [
+           {
+            "@uniquename": "T4_METALBAR_LEVEL3",
+            "@enchantmentlevel": "3",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_LEATHER_LEVEL3",
+            "@enchantmentlevel": "3",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_ARTEFACT_2H_DUALSICKLE_UNDEAD",
+            "@count": "1",
+            "@maxreturnamount": "0"
+           }
+          ]
+         },
+         {
+          "@silver": "0",
+          "@time": "3.333",
+          "@craftingfocus": "9191",
+          "craftresource": [
+           {
+            "@uniquename": "T4_METALBAR_LEVEL3",
+            "@enchantmentlevel": "3",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_LEATHER_LEVEL3",
+            "@enchantmentlevel": "3",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_ARTEFACT_TOKEN_FAVOR_3",
+            "@count": "1",
+            "@maxreturnamount": "0"
+           }
+          ]
+         }
+        ],
+        "upgraderequirements": {
+         "upgraderesource": {
+          "@uniquename": "T4_RELIC",
+          "@count": "384"
+         }
+        }
+       },
+       {
+        "@enchantmentlevel": "4",
+        "@itempower": "1175",
+        "@durability": "217090",
+        "craftingrequirements": [
+         {
+          "@silver": "0",
+          "@time": "5",
+          "@craftingfocus": "16085",
+          "craftresource": [
+           {
+            "@uniquename": "T4_METALBAR_LEVEL4",
+            "@enchantmentlevel": "4",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_LEATHER_LEVEL4",
+            "@enchantmentlevel": "4",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_ARTEFACT_2H_DUALSICKLE_UNDEAD",
+            "@count": "1",
+            "@maxreturnamount": "0"
+           }
+          ]
+         },
+         {
+          "@silver": "0",
+          "@time": "5",
+          "@craftingfocus": "16085",
+          "craftresource": [
+           {
+            "@uniquename": "T4_METALBAR_LEVEL4",
+            "@enchantmentlevel": "4",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_LEATHER_LEVEL4",
+            "@enchantmentlevel": "4",
+            "@count": "16"
+           },
+           {
+            "@uniquename": "T4_ARTEFACT_TOKEN_FAVOR_3",
+            "@count": "1",
+            "@maxreturnamount": "0"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ]
+  }
+ },
+ "names_json": [
+  {
+   "UniqueName": "T5_FARM_MOABIRD_FW_BRIDGEWATCH_BABY",
+   "LocalizedNames": {
+    "EN-US": "Baby Moabird"
+   }
+  },
+  {
+   "UniqueName": "T5_FARM_OWL_FW_BRECILIEN_BABY",
+   "LocalizedNames": {
+    "EN-US": "Mystic Owlet"
+   }
+  },
+  {
+   "UniqueName": "T4_POTION_HEAL",
+   "LocalizedNames": {
+    "EN-US": "Healing Potion"
+   }
+  },
+  {
+   "UniqueName": "T4_POTION_HEAL@1",
+   "LocalizedNames": {
+    "EN-US": "Healing Potion"
+   }
+  },
+  {
+   "UniqueName": "T4_PLANKS",
+   "LocalizedNames": {
+    "EN-US": "Pine Planks"
+   }
+  },
+  {
+   "UniqueName": "T5_PLANKS",
+   "LocalizedNames": {
+    "EN-US": "Cedar Planks"
+   }
+  },
+  {
+   "UniqueName": "T4_LEATHER",
+   "LocalizedNames": {
+    "EN-US": "Worked Leather"
+   }
+  },
+  {
+   "UniqueName": "T4_CLOTH",
+   "LocalizedNames": {
+    "EN-US": "Fine Cloth"
+   }
+  },
+  {
+   "UniqueName": "T4_CAPEITEM_FW_MARTLOCK",
+   "LocalizedNames": {
+    "EN-US": "Adept's Martlock Cape"
+   }
+  },
+  {
+   "UniqueName": "T4_BAG",
+   "LocalizedNames": {
+    "EN-US": "Adept's Bag"
+   }
+  },
+  {
+   "UniqueName": "T4_BAG@1",
+   "LocalizedNames": {
+    "EN-US": "Adept's Bag"
+   }
+  },
+  {
+   "UniqueName": "T4_2H_DUALSICKLE_UNDEAD",
+   "LocalizedNames": {
+    "EN-US": "Adept's Deathgivers"
+   }
+  }
+ ]
+}

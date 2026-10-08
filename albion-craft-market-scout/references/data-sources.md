@@ -55,7 +55,7 @@ GET {host}/api/v2/stats/history/{IDs}.json?date=YYYY-MM-DD&end_date=YYYY-MM-DD&l
 - `item_count` is units traded in that bucket. `avg_price` is silver per unit for those trades.
 - `time-scale` is 1, 6 or 24 hours. Anything else becomes 1.
 - The first daily bucket can start before `date` and be partial. Drop it.
-- Data lags 1 to 3 days, and the lag differs by city. Compare each city on its own latest 7 days.
+- History reaches AODP only when a player running a data client opens an item's price chart, so data lags 1 to 3 days and the lag differs by city and by item. Find each city's latest day across many items (the script adds about 20 often-viewed reference items to every history request for this), then judge every item on the 7 days ending that day. A day without data inside that window counts as zero sales.
 - Volume-weighted average = sum(item_count x avg_price) / sum(item_count).
 - A city/item with no history is left out of the response. Missing history is not proof of zero demand, but you cannot recommend an item on unseen demand.
 

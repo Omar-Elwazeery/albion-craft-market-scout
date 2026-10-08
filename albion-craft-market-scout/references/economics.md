@@ -3,6 +3,8 @@
 Read this when you compute profit by hand, explain a number, or a patch may have changed one.
 Checked 2026-10-07 against the official wiki, forum posts and the game data in `ao-data/ao-bin-dumps` (dump of 2026-09-23). The Dragonfire update (2026-08-31) changed none of these values. If a newer patch did, pass the new value to the script with a flag instead of editing it.
 
+`python scripts/albion_scout.py check-game-data` compares the base bonus, every city specialization, the refining bonuses and the station fee cap with the latest `craftingmodifiers.json` and `gamedata.json`. It also checks that a few known recipes and item values still parse the same. The web app's build runs it every time and stops publishing on any difference. Sales tax and the setup fee are not in that game data, so check them by hand.
+
 ## Contents
 - Market fees
 - Resource return rate (no Focus)
