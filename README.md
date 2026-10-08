@@ -10,6 +10,26 @@ It comes in three forms that share the same math:
 - **AI agent skill:** follows the open [Agent Skills](https://agentskills.io/specification) format, so the same folder works in Claude Code, Codex, Gemini CLI, Cursor, GitHub Copilot, OpenCode, Hermes Agent and other tools that read `SKILL.md`. Chat-only AIs can use it by pasting the instructions.
 - **Command-line tool:** `albion_scout.py`, Python 3.8+ with no packages.
 
+## How it compares
+
+**Checking markets by hand** shows exact prices and how many units sit at each price, which no website can. But you see one market at a time, you see orders rather than completed sales, and fees are easy to forget. Use a scan to find candidates, then check the top few in game before you buy materials.
+
+**Calculator sites** such as [Albion Free Market](https://albionfreemarket.com/crafting) and [AlbionOracle](https://albionoracle.com/en/craft) work out one item in detail, including Focus, hideouts and journals. They are the right tool once you know what to craft.
+
+**Scanner sites** such as [Albion Profit Forge](https://albionprofitforge.com/) rank thousands of crafts by profit and cover more activities, such as flipping and salvaging.
+
+This tool is a scanner built on one rule: a craft only pays if people are buying it.
+
+- **Real sales decide the verdict.** An item is marked `pilot` only when the selling city averaged at least 5 sales a day over the last 7 days and the margin is at least 10%. An item nobody bought in the last 7 days is marked `avoid`, however big its margin looks.
+- **High listings are not trusted.** The sale price is the lower of the current price and the 7-day average sale price. Prices older than 24 hours are ignored.
+- **Every cost is counted:** the resource return rate for the craft city, station fee, sales tax, the 2.5% setup fee and transport.
+- **It sizes a test batch** at about 5% of one day's sales, capped by your budget.
+- **It shows the safe route.** When the best route runs through Caerleon or its Black Market, it also shows the profit without them.
+- **It is free and open.** No account, no paid tier, and every formula is in this repo for anyone to check.
+- **It also works as an AI skill**, so you can ask in plain words, for example to check a crafting strategy from a video.
+
+What it leaves out: Focus, crafting specialization, journals and higher-quality rolls are not counted, so its numbers are on the safe side and experienced crafters will usually earn more. It covers crafting and refining, not flipping or salvaging. Like every Albion price site, it is only as fresh as what players upload to the Albion Online Data Project.
+
 ## What is in the repo
 
 ```
