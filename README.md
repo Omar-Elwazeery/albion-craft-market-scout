@@ -98,6 +98,8 @@ Fees, return rates and city bonuses are listed with sources and a check date in 
 
 Results are estimates from community data, not guarantees. Always test with a small batch.
 
+Prices are only as fresh as what players upload. If you play, run the [Albion Data Client](https://github.com/ao-data/albiondata-client) while you visit markets: it sends the prices your game shows to the Data Project, which makes every scan more accurate for everyone.
+
 ## License
 
-MIT
+[MIT](LICENSE)
